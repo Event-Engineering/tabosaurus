@@ -21,6 +21,7 @@
       "package.json"
     ],
     "mac": {
+      "identity": null,
       "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }]
     },
     "win": {
