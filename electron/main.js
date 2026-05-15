@@ -172,13 +172,12 @@ ipcMain.handle('window:open', (_, { url, displayId }) => {
     width: display.bounds.width,
     height: display.bounds.height,
     frame: false,
+    backgroundColor: '#0d1117',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true
     }
   })
-
-  win.loadURL(url)
 
   if (process.platform === 'darwin') {
     win.setSimpleFullScreen(true)
@@ -191,9 +190,7 @@ ipcMain.handle('window:open', (_, { url, displayId }) => {
 
   win.webContents.on('did-finish-load', () => {
     if (win.isDestroyed()) return
-    // Always suppress scrollbars
     win.webContents.insertCSS(HIDE_SCROLLBARS_CSS).catch(() => {})
-    // Re-apply blackout if it was active before this navigation
     const data = browserWindows.get(id)
     if (data && data.blackout) applyBlackout(win)
   })
@@ -202,6 +199,17 @@ ipcMain.handle('window:open', (_, { url, displayId }) => {
     browserWindows.delete(id)
     notifyControlWindow()
   })
+
+  // Load the local loading page immediately so the window is never blank,
+  // then chain into the real URL. Chromium keeps the loading page visible
+  // until the new navigation commits, so it stays up during DNS/connect waits.
+  win.loadFile(path.join(__dirname, 'loading.html'), { query: { url } })
+    .then(() => win.loadURL(url))
+    .catch(() => {
+      if (!win.isDestroyed()) {
+        win.loadFile(path.join(__dirname, 'error.html'), { query: { url } }).catch(() => {})
+      }
+    })
 
   notifyControlWindow()
   return id
@@ -224,8 +232,10 @@ ipcMain.handle('window:navigate', async (_, { id, url }) => {
     await data.win.loadURL(url)
     data.url = url
     notifyControlWindow()
-  } catch (e) {
-    console.error('Navigate failed:', e.message)
+  } catch {
+    if (!data.win.isDestroyed()) {
+      await data.win.loadFile(path.join(__dirname, 'error.html'), { query: { url } }).catch(() => {})
+    }
   }
 })
 

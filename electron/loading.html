@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      flex-direction: column;
+      gap: 20px;
+      user-select: none;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 2px solid rgba(157, 119, 245, 0.15);
+      border-top-color: rgba(157, 119, 245, 0.7);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .url {
+      font-size: 13px;
+      color: #484f58;
+      font-family: monospace;
+      max-width: 640px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <div class="url" id="url"></div>
+  <script>
+    const params = new URLSearchParams(location.search)
+    const url = params.get('url') || ''
+    const el = document.getElementById('url')
+    el.textContent = url
+    el.title = url
+  </script>
+</body>
+</html>
