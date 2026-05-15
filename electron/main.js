@@ -1,8 +1,9 @@
 const { app, BrowserWindow, ipcMain, screen } = require('electron')
 const path = require('path')
+const fs = require('fs')
 
 let controlWindow = null
-const browserWindows = new Map() // id -> { win, url, displayId, blackout }
+const browserWindows = new Map() // id -> { win, url, displayId, blackout, hidden }
 let nextId = 1
 
 // ── Control window ────────────────────────────────────────────
@@ -50,6 +51,7 @@ function createControlWindow() {
 function notifyControlWindow() {
   if (!controlWindow || controlWindow.isDestroyed()) return
   controlWindow.webContents.send('windows:updated', buildWindowList())
+  saveState()
 }
 
 function buildDisplayList() {
@@ -143,6 +145,110 @@ async function removeBlackout(win) {
   } catch { /* page may be mid-navigation */ }
 }
 
+// ── Persistence ───────────────────────────────────────────────
+
+function saveState() {
+  const state = {
+    windows: Array.from(browserWindows.values()).map(d => ({
+      url: d.url,
+      displayId: d.displayId
+    }))
+  }
+  try {
+    fs.writeFileSync(path.join(app.getPath('userData'), 'state.json'), JSON.stringify(state))
+  } catch (e) {
+    console.error('Failed to save state:', e.message)
+  }
+}
+
+function loadState() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'state.json'), 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+// ── Window factory ────────────────────────────────────────────
+
+function openBrowserWindow(url, displayId, { hidden = false } = {}) {
+  const allDisplays = screen.getAllDisplays()
+  const display = allDisplays.find(d => d.id === displayId) || screen.getPrimaryDisplay()
+
+  const win = new BrowserWindow({
+    x: display.bounds.x,
+    y: display.bounds.y,
+    width: display.bounds.width,
+    height: display.bounds.height,
+    frame: false,
+    show: !hidden,
+    backgroundColor: '#0d1117',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  })
+
+  if (!hidden) {
+    if (process.platform === 'darwin') {
+      win.setSimpleFullScreen(true)
+    } else {
+      win.setFullScreen(true)
+    }
+  }
+
+  const id = nextId++
+  browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden })
+
+  win.webContents.on('did-finish-load', () => {
+    if (win.isDestroyed()) return
+    win.webContents.insertCSS(HIDE_SCROLLBARS_CSS).catch(() => {})
+    const data = browserWindows.get(id)
+    if (data && data.blackout) applyBlackout(win)
+  })
+
+  win.on('closed', () => {
+    browserWindows.delete(id)
+    notifyControlWindow()
+  })
+
+  if (hidden) {
+    // Window isn't visible — skip the loading page, just load in background
+    win.loadURL(url).catch(() => {
+      if (!win.isDestroyed()) {
+        win.loadFile(path.join(__dirname, 'error.html'), { query: { url } }).catch(() => {})
+      }
+    })
+  } else {
+    // Load the local loading page immediately so the window is never blank,
+    // then chain into the real URL. Chromium keeps the loading page visible
+    // until the new navigation commits, so it stays up during DNS/connect waits.
+    win.loadFile(path.join(__dirname, 'loading.html'), { query: { url } })
+      .then(() => win.loadURL(url))
+      .catch(() => {
+        if (!win.isDestroyed()) {
+          win.loadFile(path.join(__dirname, 'error.html'), { query: { url } }).catch(() => {})
+        }
+      })
+  }
+
+  return id
+}
+
+function restoreWindows() {
+  const state = loadState()
+  if (!state || !Array.isArray(state.windows) || state.windows.length === 0) return
+
+  const currentDisplayIds = new Set(screen.getAllDisplays().map(d => d.id))
+
+  for (const { url, displayId } of state.windows) {
+    const hidden = !currentDisplayIds.has(displayId)
+    openBrowserWindow(url, displayId, { hidden })
+  }
+
+  notifyControlWindow()
+}
+
 // ── IPC: displays ─────────────────────────────────────────────
 
 ipcMain.handle('display:list', () => buildDisplayList())
@@ -163,54 +269,7 @@ ipcMain.handle('control:alwaysontop', (_, { enabled }) => {
 ipcMain.handle('window:list', () => buildWindowList())
 
 ipcMain.handle('window:open', (_, { url, displayId }) => {
-  const displays = screen.getAllDisplays()
-  const display = displays.find(d => d.id === displayId) || screen.getPrimaryDisplay()
-
-  const win = new BrowserWindow({
-    x: display.bounds.x,
-    y: display.bounds.y,
-    width: display.bounds.width,
-    height: display.bounds.height,
-    frame: false,
-    backgroundColor: '#0d1117',
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true
-    }
-  })
-
-  if (process.platform === 'darwin') {
-    win.setSimpleFullScreen(true)
-  } else {
-    win.setFullScreen(true)
-  }
-
-  const id = nextId++
-  browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden: false })
-
-  win.webContents.on('did-finish-load', () => {
-    if (win.isDestroyed()) return
-    win.webContents.insertCSS(HIDE_SCROLLBARS_CSS).catch(() => {})
-    const data = browserWindows.get(id)
-    if (data && data.blackout) applyBlackout(win)
-  })
-
-  win.on('closed', () => {
-    browserWindows.delete(id)
-    notifyControlWindow()
-  })
-
-  // Load the local loading page immediately so the window is never blank,
-  // then chain into the real URL. Chromium keeps the loading page visible
-  // until the new navigation commits, so it stays up during DNS/connect waits.
-  win.loadFile(path.join(__dirname, 'loading.html'), { query: { url } })
-    .then(() => win.loadURL(url))
-    .catch(() => {
-      if (!win.isDestroyed()) {
-        win.loadFile(path.join(__dirname, 'error.html'), { query: { url } }).catch(() => {})
-      }
-    })
-
+  const id = openBrowserWindow(url, displayId)
   notifyControlWindow()
   return id
 })
@@ -260,12 +319,15 @@ ipcMain.handle('window:visibility', async (_, { id, hidden }) => {
     await exitFullscreen(data.win)
     data.win.minimize()
   } else {
-    const display = screen.getAllDisplays().find(d => d.id === data.displayId)
-    data.win.show()
-    if (display) {
-      data.win.setBounds(display.bounds)
-      await enterFullscreen(data.win)
+    // Fall back to primary if the target display is no longer connected
+    let display = screen.getAllDisplays().find(d => d.id === data.displayId)
+    if (!display) {
+      display = screen.getPrimaryDisplay()
+      data.displayId = display.id
     }
+    data.win.show()
+    data.win.setBounds(display.bounds)
+    await enterFullscreen(data.win)
   }
   notifyControlWindow()
 })
@@ -300,6 +362,7 @@ ipcMain.handle('window:thumbnail', async (_, { id }) => {
 
 app.whenReady().then(() => {
   createControlWindow()
+  restoreWindows()
   screen.on('display-added', notifyDisplaysUpdated)
   screen.on('display-removed', notifyDisplaysUpdated)
   screen.on('display-metrics-changed', notifyDisplaysUpdated)
