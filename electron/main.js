@@ -116,33 +116,19 @@ function enterFullscreen(win) {
 }
 
 // ── Blackout helpers ──────────────────────────────────────────
-// Pure JS overlay — no insertCSS key tracking needed, survives navigation safely.
-
-const BLACKOUT_JS_ADD =
-  'if(!document.getElementById("__br_blackout")){' +
-  'const d=document.createElement("div");d.id="__br_blackout";' +
-  'd.style.cssText="position:fixed!important;top:0!important;left:0!important;' +
-  'width:100vw!important;height:100vh!important;background:#000!important;' +
-  'z-index:2147483647!important;pointer-events:none!important";' +
-  'document.documentElement.appendChild(d)}void 0'
-
-const BLACKOUT_JS_REMOVE =
-  'const d=document.getElementById("__br_blackout");if(d)d.remove()'
+// DOM manipulation is handled in browser-preload.js via IPC — avoids
+// executeJavaScript unreliability in Electron 29 on Windows.
 
 const HIDE_SCROLLBARS_CSS =
   '::-webkit-scrollbar{display:none!important}' +
   '*{scrollbar-width:none!important;-ms-overflow-style:none!important}'
 
-async function applyBlackout(win) {
-  try {
-    await win.webContents.executeJavaScript(BLACKOUT_JS_ADD)
-  } catch { /* page may be mid-navigation or window hidden */ }
+function applyBlackout(win) {
+  if (!win.isDestroyed()) win.webContents.send('blackout:on')
 }
 
-async function removeBlackout(win) {
-  try {
-    await win.webContents.executeJavaScript(BLACKOUT_JS_REMOVE)
-  } catch { /* page may be mid-navigation */ }
+function removeBlackout(win) {
+  if (!win.isDestroyed()) win.webContents.send('blackout:off')
 }
 
 // ── Persistence ───────────────────────────────────────────────
@@ -185,7 +171,8 @@ function openBrowserWindow(url, displayId, { hidden = false } = {}) {
     backgroundColor: '#0d1117',
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      preload: path.join(__dirname, 'browser-preload.js')
     }
   })
 
@@ -298,16 +285,12 @@ ipcMain.handle('window:navigate', async (_, { id, url }) => {
   }
 })
 
-ipcMain.handle('window:blackout', async (_, { id, blackout }) => {
+ipcMain.handle('window:blackout', (_, { id, blackout }) => {
   const data = browserWindows.get(id)
   if (!data || data.win.isDestroyed()) return
-  // Set flag first — prevents did-finish-load from re-applying while we remove
   data.blackout = blackout
-  if (blackout) {
-    await applyBlackout(data.win)
-  } else {
-    await removeBlackout(data.win)
-  }
+  if (blackout) applyBlackout(data.win)
+  else removeBlackout(data.win)
   notifyControlWindow()
 })
 

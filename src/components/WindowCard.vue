@@ -12,14 +12,20 @@
         <span>Loading preview…</span>
       </div>
       <!-- Blackout overlay on thumbnail -->
-      <div v-if="win.blackout" class="blackout-overlay">
-        <svg class="blackout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path>
-          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
-          <line x1="1" y1="1" x2="23" y2="23"></line>
-        </svg>
-        <span>Blacked Out</span>
-      </div>
+      <Transition name="blackout" :duration="550">
+        <div v-if="win.blackout" class="blackout-overlay">
+          <div class="curtain-left"></div>
+          <div class="curtain-right"></div>
+          <div class="blackout-label">
+            <svg class="blackout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="2" y1="3" x2="22" y2="3"></line>
+              <path d="M2 3 L2 21 C4 23 10 21 12 19 L12 3"></path>
+              <path d="M22 3 L22 21 C20 23 14 21 12 19 L12 3"></path>
+            </svg>
+            <span>Blacked Out</span>
+          </div>
+        </div>
+      </Transition>
     </div>
 
     <!-- Info + URL edit -->
@@ -226,11 +232,30 @@ export default {
 .blackout-overlay {
   position: absolute;
   inset: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.curtain-left,
+.curtain-right {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
   background: #000;
+}
+
+.curtain-left { left: 0; }
+.curtain-right { right: 0; }
+
+.blackout-label {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 0.6em;
   color: rgba(255, 255, 255, 0.3);
   font-size: 2.5cqw;
@@ -241,6 +266,53 @@ export default {
 .blackout-icon {
   width: 5cqw;
   height: 5cqw;
+}
+
+/* Enter: curtains sweep in, label fades in once closed */
+.blackout-enter-active .curtain-left {
+  animation: curtain-from-left 0.4s ease forwards;
+}
+.blackout-enter-active .curtain-right {
+  animation: curtain-from-right 0.4s ease forwards;
+}
+.blackout-enter-active .blackout-label {
+  animation: label-fade-in 0.2s 0.3s ease both;
+}
+
+/* Leave: label fades first, then curtains open */
+.blackout-leave-active .curtain-left {
+  animation: curtain-to-left 0.35s 0.15s ease forwards;
+}
+.blackout-leave-active .curtain-right {
+  animation: curtain-to-right 0.35s 0.15s ease forwards;
+}
+.blackout-leave-active .blackout-label {
+  animation: label-fade-out 0.15s ease forwards;
+}
+
+@keyframes curtain-from-left {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes curtain-from-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes curtain-to-left {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100%); }
+}
+@keyframes curtain-to-right {
+  from { transform: translateX(0); }
+  to   { transform: translateX(100%); }
+}
+@keyframes label-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes label-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
 }
 
 /* Card body */
