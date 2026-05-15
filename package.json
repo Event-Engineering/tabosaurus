@@ -4,7 +4,7 @@
   "description": "Controllable fullscreen browser with Vue 3 control UI",
   "main": "electron/main.js",
   "scripts": {
-    "dev": "concurrently -k -n VITE,ELECTRON -c cyan,yellow \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev": "concurrently -k -n VITE,ELECTRON -c cyan,yellow \"vite\" \"wait-on http://localhost:8080 && electron .\"",
     "start": "vite build && electron .",
     "package:mac": "vite build && electron-builder --mac",
     "package:win": "vite build && electron-builder --win"

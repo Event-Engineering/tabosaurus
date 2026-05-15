@@ -30,7 +30,7 @@ function createControlWindow() {
 
   const isDev = process.env.npm_lifecycle_event === 'dev'
   const url = isDev
-    ? 'http://localhost:5173'
+    ? 'http://localhost:8080'
     : `file://${path.join(__dirname, '../dist/index.html')}`
 
   controlWindow.loadURL(url)
