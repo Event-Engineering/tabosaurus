@@ -57,12 +57,14 @@
           :win="win"
           :thumbnail="thumbnails[win.id]"
           :display="displayById(win.displayId)"
+          :interactive="win.id === interactiveWindowId"
           @refresh="refreshWindow(win.id)"
           @close="closeWindow(win.id)"
           @move="startMove(win)"
           @navigate="(url) => navigateWindow(win.id, url)"
           @blackout="blackoutWindow(win.id, !win.blackout)"
           @visibility="setWindowVisibility(win.id, !win.hidden)"
+          @toggle-interactive="toggleInteractive(win.id)"
           @interact-click="(normX, normY, cb) => interactClick(win.id, normX, normY, cb)"
           @interact-scroll="(normX, normY, deltaX, deltaY) => interactScroll(win.id, normX, normY, deltaX, deltaY)"
           @interact-key="(key, modifiers, cb) => interactKey(win.id, key, modifiers, cb)"
@@ -96,6 +98,7 @@ export default {
     const thumbnails = ref({})
     const movingWindow = ref(null)
     const alwaysOnTop = ref(true)
+    const interactiveWindowId = ref(null)
     let thumbTimer = null
     let unsubscribe = null
     let unsubDisplays = null
@@ -153,6 +156,11 @@ export default {
       const next = { ...thumbnails.value }
       delete next[id]
       thumbnails.value = next
+      if (interactiveWindowId.value === id) interactiveWindowId.value = null
+    }
+
+    function toggleInteractive(id) {
+      interactiveWindowId.value = interactiveWindowId.value === id ? null : id
     }
 
     async function navigateWindow(id, url) {
@@ -217,9 +225,9 @@ export default {
     })
 
     return {
-      urlInput, displays, selectedDisplayId, windows, thumbnails, movingWindow, alwaysOnTop,
+      urlInput, displays, selectedDisplayId, windows, thumbnails, movingWindow, alwaysOnTop, interactiveWindowId,
       displayById, openWindow, refreshWindow, closeWindow, navigateWindow, blackoutWindow,
-      setWindowVisibility, toggleAlwaysOnTop, startMove, doMove, interactClick, interactScroll, interactKey
+      setWindowVisibility, toggleAlwaysOnTop, startMove, doMove, toggleInteractive, interactClick, interactScroll, interactKey
     }
   }
 }

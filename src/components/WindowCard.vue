@@ -110,7 +110,7 @@
     <!-- Actions -->
     <div class="card-actions">
       <button
-        @click="interactive = !interactive"
+        @click="$emit('toggle-interactive')"
         class="action-btn action-btn-interact"
         :class="{ 'action-btn-active': interactive }"
         :disabled="win.hidden"
@@ -185,20 +185,20 @@ export default {
   props: {
     win: { type: Object, required: true },
     thumbnail: { type: String, default: null },
-    display: { type: Object, default: null }
+    display: { type: Object, default: null },
+    interactive: { type: Boolean, default: false }
   },
-  emits: ['refresh', 'move', 'close', 'navigate', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key'],
+  emits: ['refresh', 'move', 'close', 'navigate', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key', 'toggle-interactive'],
   setup(props, { emit }) {
     const editing = ref(false)
     const editUrl = ref('')
     const urlInputRef = ref(null)
-    const interactive = ref(false)
     const typing = ref(false)
     const typeBuffer = ref('')
     const typeInputRef = ref(null)
 
     function onThumbnailClick(e) {
-      if (!interactive.value) return
+      if (!props.interactive) return
       const rect = e.currentTarget.getBoundingClientRect()
       emit('interact-click',
         (e.clientX - rect.left) / rect.width,
@@ -219,7 +219,7 @@ export default {
     }
 
     function onThumbnailScroll(e) {
-      if (!interactive.value) return
+      if (!props.interactive) return
       const rect = e.currentTarget.getBoundingClientRect()
       const multiplier = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 400 : 1
       emit('interact-scroll',
@@ -231,15 +231,19 @@ export default {
     }
 
     function onDocKeydown(e) {
-      if (e.key === 'Escape' && interactive.value && !typing.value) {
-        interactive.value = false
+      if (e.key === 'Escape' && props.interactive && !typing.value) {
+        emit('toggle-interactive')
         e.preventDefault()
       }
     }
 
-    watch(interactive, (val) => {
+    watch(() => props.interactive, (val) => {
       if (val) document.addEventListener('keydown', onDocKeydown)
-      else document.removeEventListener('keydown', onDocKeydown)
+      else {
+        document.removeEventListener('keydown', onDocKeydown)
+        typing.value = false
+        typeBuffer.value = ''
+      }
     })
 
     onUnmounted(() => document.removeEventListener('keydown', onDocKeydown))
@@ -288,7 +292,7 @@ export default {
       editing.value = false
     }
 
-    return { editing, editUrl, urlInputRef, startEdit, confirmEdit, cancelEdit, interactive, onThumbnailClick, onThumbnailScroll, typing, typeBuffer, typeInputRef, onTypeKeydown }
+    return { editing, editUrl, urlInputRef, startEdit, confirmEdit, cancelEdit, onThumbnailClick, onThumbnailScroll, typing, typeBuffer, typeInputRef, onTypeKeydown }
   }
 }
 </script>
