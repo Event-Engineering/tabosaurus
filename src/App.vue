@@ -37,7 +37,7 @@
       </div>
     </header>
 
-    <main class="main">
+    <main class="main" ref="mainRef">
       <div v-if="windows.length === 0" class="empty-state">
         <div class="empty-icon">
           <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
@@ -50,7 +50,7 @@
         <p class="empty-hint">Enter a URL above to open a fullscreen browser window</p>
       </div>
 
-      <div v-else class="window-grid">
+      <div v-else class="window-grid" :style="gridStyle">
         <WindowCard
           v-for="win in windows"
           :key="win.id"
@@ -85,7 +85,7 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import WindowCard from './components/WindowCard.vue'
 import MonitorPicker from './components/MonitorPicker.vue'
 
@@ -106,8 +106,82 @@ export default {
     let unsubDisplays = null
     const interactThumbTimers = {}
 
+    // Grid layout
+    const mainRef = ref(null)
+    const containerW = ref(0)
+    const containerH = ref(0)
+    let resizeObserver = null
+
+    const gridStyle = computed(() => {
+      const n = windows.value.length
+      if (n === 0 || !containerW.value) return {}
+
+      const W = containerW.value  // contentRect already excludes .main padding
+      const H = containerH.value
+      const GAP = 16
+
+      // Card height ≈ cardW × 0.663 + 21
+      // (thumbnail 9/16, url-row dominated by 4.2cqw icon-btns, actions by 1.3em SVGs)
+      const C = 0.663, K = 21
+
+      // Minimum card width: action row has 5 labelled buttons + 1 icon-only close.
+      // At 10px font floor the row needs ~330px; 340 gives comfortable breathing room.
+      const MIN_CARD_W = 340
+
+      // Column count that best matches the container's aspect ratio.
+      // Card aspect ratio = 1/C ≈ 1.51
+      let cols = Math.max(1, Math.min(n, Math.round(Math.sqrt(n * W / H / (1 / C)))))
+      while (cols > 1 && (W - GAP * (cols - 1)) / cols < MIN_CARD_W) cols--
+
+      const rows = Math.ceil(n / cols)
+
+      // Max card width where all rows fit the container height without scrolling.
+      // Derived from: rows × (C×cardW + K) + GAP×(rows−1) ≤ H
+      const maxCardW = (H - 4 - K * rows - GAP * (rows - 1)) / (C * rows)
+
+      // Use whichever is smaller: filling the grid width, or the height-constrained max
+      const cardW = Math.min((W - GAP * (cols - 1)) / cols, maxCardW)
+      const maxW = Math.round(cols * cardW + GAP * (cols - 1))
+
+      return { gridTemplateColumns: `repeat(${cols}, 1fr)`, maxWidth: `${maxW}px` }
+    })
+
     function displayById(id) {
       return displays.value.find(d => d.id === id) || null
+    }
+
+    function fitWindowToCards(n) {
+      if (n === 0) return
+      const GAP = 16, C = 0.663, K = 21, MAIN_PAD = 40
+
+      // Target ~27% of the primary display width per card
+      const primary = displays.value.find(d => d.isPrimary) || displays.value[0]
+      const CARD_W = primary ? Math.round(primary.bounds.width * 0.27) : 480
+
+      const headerEl = document.querySelector('.header')
+      const HEADER_H = headerEl ? headerEl.offsetHeight : 64
+
+      // Minimum width the header needs: sum the fixed (non-flex) children
+      const urlBar = headerEl?.querySelector('.url-bar')
+      const fixedW = urlBar
+        ? Array.from(urlBar.children)
+            .filter(el => !el.matches('.url-input'))
+            .reduce((sum, el) => sum + el.offsetWidth, 0)
+          + (urlBar.children.length - 1) * 8   // gaps
+          + 32                                  // header padding (16px × 2)
+          + 120                                 // minimum for the url input itself
+        : 500
+
+      const cols = Math.max(1, Math.min(n, Math.round(Math.sqrt(n))))
+      const rows = Math.ceil(n / cols)
+      const w = Math.max(cols * CARD_W + (cols - 1) * GAP + MAIN_PAD, fixedW)
+      const h = rows * (C * CARD_W + K) + (rows - 1) * GAP + MAIN_PAD + HEADER_H
+      const chromeW = window.outerWidth - window.innerWidth
+      const chromeH = window.outerHeight - window.innerHeight
+      const minW = Math.max(CARD_W + MAIN_PAD, fixedW, 340 + MAIN_PAD)
+      const minH = Math.round(C * CARD_W + K) + MAIN_PAD + HEADER_H
+      window.api.setMinimumSize(Math.round(minW) + chromeW, Math.round(minH) + chromeH)
+      window.api.setContentSize(Math.round(w), Math.round(h))
     }
 
     async function init() {
@@ -116,9 +190,12 @@ export default {
       if (defaultDisplay) selectedDisplayId.value = defaultDisplay.id
 
       windows.value = await window.api.listWindows()
+      fitWindowToCards(windows.value.length)
 
       unsubscribe = window.api.onWindowsUpdated(updated => {
+        const prevCount = windows.value.length
         windows.value = updated
+        if (updated.length !== prevCount) fitWindowToCards(updated.length)
       })
 
       unsubDisplays = window.api.onDisplaysUpdated(updated => {
@@ -221,16 +298,25 @@ export default {
       movingWindow.value = null
     }
 
-    onMounted(init)
+    onMounted(() => {
+      init()
+      resizeObserver = new ResizeObserver(([entry]) => {
+        containerW.value = entry.contentRect.width
+        containerH.value = entry.contentRect.height
+      })
+      if (mainRef.value) resizeObserver.observe(mainRef.value)
+    })
 
     onUnmounted(() => {
       if (unsubscribe) unsubscribe()
       if (unsubDisplays) unsubDisplays()
       if (thumbTimer) clearInterval(thumbTimer)
+      if (resizeObserver) resizeObserver.disconnect()
     })
 
     return {
       urlInput, displays, selectedDisplayId, windows, thumbnails, movingWindow, alwaysOnTop, interactiveWindowId,
+      mainRef, gridStyle,
       displayById, openWindow, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
       setWindowVisibility, toggleAlwaysOnTop, startMove, doMove, toggleInteractive, interactClick, interactScroll, interactKey
     }
@@ -380,10 +466,8 @@ export default {
 
 .window-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
   align-content: start;
-  max-width: calc((100vh - 180px) * 1.5);
   margin: 0 auto;
   width: 100%;
 }

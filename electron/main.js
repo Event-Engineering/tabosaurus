@@ -12,8 +12,8 @@ function createControlWindow() {
   controlWindow = new BrowserWindow({
     width: 960,
     height: 700,
-    minWidth: 700,
-    minHeight: 500,
+    minWidth: 500,
+    minHeight: 400,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -261,6 +261,20 @@ function restoreWindows() {
 ipcMain.handle('display:list', () => buildDisplayList())
 
 // ── IPC: control window ───────────────────────────────────────
+
+ipcMain.handle('control:setContentSize', (_, { w, h }) => {
+  if (!controlWindow || controlWindow.isDestroyed()) return
+  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize
+  controlWindow.setContentSize(
+    Math.round(Math.min(w, sw * 0.95)),
+    Math.round(Math.min(h, sh * 0.95))
+  )
+})
+
+ipcMain.handle('control:setMinimumSize', (_, { w, h }) => {
+  if (!controlWindow || controlWindow.isDestroyed()) return
+  controlWindow.setMinimumSize(Math.round(w), Math.round(h))
+})
 
 ipcMain.handle('control:alwaysontop', (_, { enabled }) => {
   if (!controlWindow || controlWindow.isDestroyed()) return

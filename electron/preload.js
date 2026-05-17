@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('api', {
   getActiveInputValue: (id) => ipcRenderer.invoke('window:getActiveInputValue', { id }),
   goBack: (id) => ipcRenderer.invoke('window:goBack', { id }),
   goForward: (id) => ipcRenderer.invoke('window:goForward', { id }),
+  setContentSize: (w, h) => ipcRenderer.invoke('control:setContentSize', { w, h }),
+  setMinimumSize: (w, h) => ipcRenderer.invoke('control:setMinimumSize', { w, h }),
   setAlwaysOnTop: (enabled) => ipcRenderer.invoke('control:alwaysontop', { enabled }),
   onWindowsUpdated: (callback) => {
     const handler = (_, windows) => callback(windows)
