@@ -16,6 +16,30 @@
         </svg>
         <span>Loading preview…</span>
       </div>
+      <!-- Typing overlay -->
+      <div v-if="typing && interactive" class="type-overlay" @click.stop>
+        <svg class="type-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="6" width="20" height="12" rx="2"/>
+          <line x1="6" y1="10" x2="6" y2="10" stroke-width="2.5"/>
+          <line x1="10" y1="10" x2="10" y2="10" stroke-width="2.5"/>
+          <line x1="14" y1="10" x2="14" y2="10" stroke-width="2.5"/>
+          <line x1="18" y1="10" x2="18" y2="10" stroke-width="2.5"/>
+          <line x1="6" y1="14" x2="6" y2="14" stroke-width="2.5"/>
+          <line x1="18" y1="14" x2="18" y2="14" stroke-width="2.5"/>
+          <line x1="10" y1="14" x2="14" y2="14"/>
+        </svg>
+        <input
+          ref="typeInputRef"
+          v-model="typeBuffer"
+          class="type-input"
+          @keydown="onTypeKeydown"
+          placeholder="Typing to browser…"
+          spellcheck="false"
+          autocomplete="off"
+        />
+        <span class="type-hint">Esc to stop</span>
+      </div>
+
       <!-- Interactive mode indicator -->
       <div v-if="interactive" class="interactive-badge">
         <span class="interactive-dot"></span>Live
@@ -154,7 +178,7 @@
 </template>
 
 <script>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, watch, onUnmounted } from 'vue'
 
 export default {
   name: 'WindowCard',
@@ -163,19 +187,34 @@ export default {
     thumbnail: { type: String, default: null },
     display: { type: Object, default: null }
   },
-  emits: ['refresh', 'move', 'close', 'navigate', 'blackout', 'visibility', 'interact-click', 'interact-scroll'],
+  emits: ['refresh', 'move', 'close', 'navigate', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key'],
   setup(props, { emit }) {
     const editing = ref(false)
     const editUrl = ref('')
     const urlInputRef = ref(null)
     const interactive = ref(false)
+    const typing = ref(false)
+    const typeBuffer = ref('')
+    const typeInputRef = ref(null)
 
     function onThumbnailClick(e) {
       if (!interactive.value) return
       const rect = e.currentTarget.getBoundingClientRect()
       emit('interact-click',
         (e.clientX - rect.left) / rect.width,
-        (e.clientY - rect.top) / rect.height
+        (e.clientY - rect.top) / rect.height,
+        async (isTextInput, currentValue) => {
+          if (isTextInput) {
+            typing.value = true
+            typeBuffer.value = currentValue || ''
+            await nextTick()
+            typeInputRef.value?.focus()
+            typeInputRef.value?.setSelectionRange(typeBuffer.value.length, typeBuffer.value.length)
+          } else {
+            typing.value = false
+            typeBuffer.value = ''
+          }
+        }
       )
     }
 
@@ -190,6 +229,46 @@ export default {
         e.deltaY * multiplier
       )
     }
+
+    function onDocKeydown(e) {
+      if (e.key === 'Escape' && interactive.value && !typing.value) {
+        interactive.value = false
+        e.preventDefault()
+      }
+    }
+
+    watch(interactive, (val) => {
+      if (val) document.addEventListener('keydown', onDocKeydown)
+      else document.removeEventListener('keydown', onDocKeydown)
+    })
+
+    onUnmounted(() => document.removeEventListener('keydown', onDocKeydown))
+
+    async function onTypeKeydown(e) {
+      if (e.key === 'Escape') {
+        typing.value = false
+        typeBuffer.value = ''
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      }
+      if (e.key === 'Tab') e.preventDefault()
+      if (e.key === 'Enter') typeBuffer.value = ''
+      const modifiers = []
+      if (e.shiftKey) modifiers.push('shift')
+      if (e.ctrlKey) modifiers.push('control')
+      if (e.altKey) modifiers.push('alt')
+      if (e.metaKey) modifiers.push('meta')
+      const onAfterKey = e.key === 'Tab' ? async (newValue) => {
+        typeBuffer.value = newValue || ''
+        await nextTick()
+        typeInputRef.value?.select()
+      } : null
+      emit('interact-key', e.key, modifiers, onAfterKey)
+      await nextTick()
+      typeInputRef.value?.focus()
+    }
+
 
     async function startEdit() {
       editing.value = true
@@ -209,7 +288,7 @@ export default {
       editing.value = false
     }
 
-    return { editing, editUrl, urlInputRef, startEdit, confirmEdit, cancelEdit, interactive, onThumbnailClick, onThumbnailScroll }
+    return { editing, editUrl, urlInputRef, startEdit, confirmEdit, cancelEdit, interactive, onThumbnailClick, onThumbnailScroll, typing, typeBuffer, typeInputRef, onTypeKeydown }
   }
 }
 </script>
@@ -254,6 +333,53 @@ export default {
 .thumbnail-interactive {
   /* Custom crosshair: white outline drawn first, black on top — visible on any background */
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cline x1='12' y1='1' x2='12' y2='9' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='12' y1='15' x2='12' y2='23' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='1' y1='12' x2='9' y2='12' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='15' y1='12' x2='23' y2='12' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='12' r='3' stroke='white' stroke-width='2.5' fill='none'/%3E%3Cline x1='12' y1='1' x2='12' y2='9' stroke='black' stroke-width='1.5' stroke-linecap='round'/%3E%3Cline x1='12' y1='15' x2='12' y2='23' stroke='black' stroke-width='1.5' stroke-linecap='round'/%3E%3Cline x1='1' y1='12' x2='9' y2='12' stroke='black' stroke-width='1.5' stroke-linecap='round'/%3E%3Cline x1='15' y1='12' x2='23' y2='12' stroke='black' stroke-width='1.5' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='12' r='3' stroke='black' stroke-width='1' fill='none'/%3E%3C/svg%3E") 12 12, crosshair;
+}
+
+.type-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 1.5cqw;
+  padding: 1.5cqw 2cqw;
+  background: rgba(13, 17, 23, 0.92);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(63, 185, 80, 0.35);
+}
+
+.type-icon {
+  color: #3fb950;
+  flex-shrink: 0;
+  width: 3.5cqw;
+  height: 3.5cqw;
+  min-width: 12px;
+  min-height: 12px;
+}
+
+.type-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #e6edf3;
+  font-size: 2.5cqw;
+  font-family: monospace;
+  caret-color: #3fb950;
+  min-width: 0;
+}
+
+.type-input::placeholder {
+  color: #484f58;
+}
+
+.type-hint {
+  flex-shrink: 0;
+  font-size: 1.8cqw;
+  color: #484f58;
+  white-space: nowrap;
 }
 
 .interactive-badge {

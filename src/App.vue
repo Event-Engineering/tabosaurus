@@ -63,8 +63,9 @@
           @navigate="(url) => navigateWindow(win.id, url)"
           @blackout="blackoutWindow(win.id, !win.blackout)"
           @visibility="setWindowVisibility(win.id, !win.hidden)"
-          @interact-click="(normX, normY) => interactClick(win.id, normX, normY)"
+          @interact-click="(normX, normY, cb) => interactClick(win.id, normX, normY, cb)"
           @interact-scroll="(normX, normY, deltaX, deltaY) => interactScroll(win.id, normX, normY, deltaX, deltaY)"
+          @interact-key="(key, modifiers, cb) => interactKey(win.id, key, modifiers, cb)"
         />
       </div>
     </main>
@@ -164,15 +165,25 @@ export default {
       if (thumb) thumbnails.value = { ...thumbnails.value, [id]: thumb }
     }
 
-    async function interactClick(id, normX, normY) {
-      await window.api.sendClick(id, normX, normY)
+    async function interactClick(id, normX, normY, onTypingResult) {
+      const { isTextInput, currentValue } = await window.api.sendClick(id, normX, normY)
       setTimeout(() => refreshThumbnail(id), 300)
+      onTypingResult(isTextInput, currentValue)
     }
 
     function interactScroll(id, normX, normY, deltaX, deltaY) {
       window.api.sendScroll(id, normX, normY, deltaX, deltaY)
       clearTimeout(interactThumbTimers[id])
       interactThumbTimers[id] = setTimeout(() => refreshThumbnail(id), 250)
+    }
+
+    async function interactKey(id, key, modifiers, onAfterKey) {
+      await window.api.sendKey(id, key, modifiers)
+      if (onAfterKey) {
+        await new Promise(r => setTimeout(r, 80))
+        const value = await window.api.getActiveInputValue(id)
+        onAfterKey(value)
+      }
     }
 
     async function blackoutWindow(id, blackout) {
@@ -208,7 +219,7 @@ export default {
     return {
       urlInput, displays, selectedDisplayId, windows, thumbnails, movingWindow, alwaysOnTop,
       displayById, openWindow, refreshWindow, closeWindow, navigateWindow, blackoutWindow,
-      setWindowVisibility, toggleAlwaysOnTop, startMove, doMove, interactClick, interactScroll
+      setWindowVisibility, toggleAlwaysOnTop, startMove, doMove, interactClick, interactScroll, interactKey
     }
   }
 }

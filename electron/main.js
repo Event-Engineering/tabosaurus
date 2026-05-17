@@ -343,14 +343,111 @@ ipcMain.handle('window:thumbnail', async (_, { id }) => {
 
 ipcMain.handle('window:sendClick', async (_, { id, normX, normY }) => {
   const data = browserWindows.get(id)
-  if (!data || data.win.isDestroyed() || data.hidden) return
+  if (!data || data.win.isDestroyed() || data.hidden) return false
   const display = screen.getAllDisplays().find(d => d.id === data.displayId) || screen.getPrimaryDisplay()
   const x = Math.round(normX * display.bounds.width)
   const y = Math.round(normY * display.bounds.height)
+
+  // Inspect the element at the click position before sending the click.
+  // elementFromPoint is reliable; activeElement after a synthetic click is not.
+  let isTextInput = false
+  try {
+    isTextInput = await data.win.webContents.executeJavaScript(
+      `(function(){
+        function isText(el){
+          if(!el)return false;
+          if(el.tagName==='TEXTAREA')return true;
+          if(el.tagName==='INPUT'){
+            var t=(el.type||'text').toLowerCase();
+            return !['button','submit','reset','checkbox','radio','file','image','range','color'].includes(t);
+          }
+          return !!el.isContentEditable;
+        }
+        function checkAt(doc,x,y){
+          var el=doc.elementFromPoint(x,y);
+          while(el&&el.tagName!=='BODY'){
+            if(isText(el))return true;
+            if(el.tagName==='IFRAME'){
+              try{var r=el.getBoundingClientRect();return checkAt(el.contentDocument,x-r.left,y-r.top);}
+              catch(e){return false;}
+            }
+            el=el.parentElement;
+          }
+          return false;
+        }
+        return checkAt(document,${x},${y});
+      })()`
+    )
+  } catch { isTextInput = false }
+
   data.win.webContents.sendInputEvent({ type: 'mouseMove', x, y })
   data.win.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 })
   await new Promise(r => setTimeout(r, 50))
   data.win.webContents.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 })
+
+  let currentValue = ''
+  if (isTextInput) {
+    await new Promise(r => setTimeout(r, 50))
+    try {
+      currentValue = await data.win.webContents.executeJavaScript(
+        '(function(){' +
+          'function readEl(el){' +
+            'if(!el||el.type==="password")return "";' +
+            'if(typeof el.value==="string")return el.value;' +
+            'if(el.isContentEditable)return el.textContent||"";' +
+            'return "";' +
+          '}' +
+          'const el=document.activeElement;if(!el)return "";' +
+          'if(el.tagName==="IFRAME"){' +
+            'try{return readEl(el.contentDocument.activeElement);}catch(e){return "";}' +
+          '}' +
+          'return readEl(el);' +
+        '})()'
+      )
+    } catch { currentValue = '' }
+  }
+
+  return { isTextInput, currentValue }
+})
+
+ipcMain.handle('window:getActiveInputValue', async (_, { id }) => {
+  const data = browserWindows.get(id)
+  if (!data || data.win.isDestroyed()) return ''
+  try {
+    return await data.win.webContents.executeJavaScript(
+      '(function(){' +
+        'function readEl(el){' +
+          'if(!el||el.type==="password")return "";' +
+          'if(typeof el.value==="string")return el.value;' +
+          'if(el.isContentEditable)return el.textContent||"";' +
+          'return "";' +
+        '}' +
+        'const el=document.activeElement;if(!el)return "";' +
+        'if(el.tagName==="IFRAME"){try{return readEl(el.contentDocument.activeElement);}catch(e){return "";}}' +
+        'return readEl(el);' +
+      '})()'
+    )
+  } catch { return '' }
+})
+
+ipcMain.handle('window:sendKey', (_, { id, key, modifiers }) => {
+  const data = browserWindows.get(id)
+  if (!data || data.win.isDestroyed() || data.hidden) return
+
+  // Map DOM key names → Electron Accelerator names used by sendInputEvent
+  const keyMap = {
+    ' ': 'Space', 'Enter': 'Return',
+    'ArrowLeft': 'Left', 'ArrowRight': 'Right', 'ArrowUp': 'Up', 'ArrowDown': 'Down',
+  }
+  const keyCode = keyMap[key] || key
+  const isPrintable = key.length === 1 && !modifiers.includes('control') && !modifiers.includes('meta')
+
+  // Briefly focus the browser window to deliver the key, then immediately
+  // return focus to the control window so the typing overlay keeps capturing.
+  data.win.webContents.sendInputEvent({ type: 'keyDown', keyCode, modifiers })
+  if (isPrintable) data.win.webContents.sendInputEvent({ type: 'char', keyCode: key })
+  data.win.webContents.sendInputEvent({ type: 'keyUp', keyCode, modifiers })
+  if (controlWindow && !controlWindow.isDestroyed()) controlWindow.webContents.focus()
 })
 
 ipcMain.handle('window:sendScroll', (_, { id, normX, normY, deltaX, deltaY }) => {
