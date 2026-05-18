@@ -9,11 +9,13 @@ let nextId = 1
 // ── Control window ────────────────────────────────────────────
 
 function createControlWindow() {
+  const iconExt = process.platform === 'darwin' ? 'icns' : process.platform === 'win32' ? 'ico' : 'png'
   controlWindow = new BrowserWindow({
     width: 960,
     height: 700,
     minWidth: 500,
     minHeight: 400,
+    icon: path.join(__dirname, `../build/icon.${iconExt}`),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

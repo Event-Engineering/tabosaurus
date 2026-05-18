@@ -1,0 +1,92 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Tabosaurus</title>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14141f"></stop>
+      <stop offset="55%" stop-color="#0a0a14"></stop>
+      <stop offset="100%" stop-color="#06060c"></stop>
+    </linearGradient>
+    <radialGradient id="glow1" cx="30%" cy="20%" r="50%">
+      <stop offset="0%" stop-color="#7c6bd6" stop-opacity="0.18"></stop>
+      <stop offset="100%" stop-color="#7c6bd6" stop-opacity="0"></stop>
+    </radialGradient>
+    <radialGradient id="glow2" cx="78%" cy="85%" r="60%">
+      <stop offset="0%" stop-color="#7c6bd6" stop-opacity="0.12"></stop>
+      <stop offset="100%" stop-color="#7c6bd6" stop-opacity="0"></stop>
+    </radialGradient>
+    <clipPath id="squircle">
+      <rect x="0" y="0" width="1024" height="1024" rx="229" ry="229"></rect>
+    </clipPath>
+    <clipPath id="pageclip">
+      <rect x="92" y="512" width="840" height="450" rx="42"></rect>
+    </clipPath>
+    <clipPath id="ctrlclip">
+      <rect x="574" y="697" width="389" height="266" rx="62"></rect>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#squircle)">
+
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#bg)"></rect>
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#glow1)"></rect>
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#glow2)"></rect>
+
+
+    <g transform="translate(61.44 51.2) scale(2.2528)">
+
+      <path d="M 92 130 L 110 70 L 130 130 Z" fill="#c8c2dc"></path>
+      <path d="M 138 130 L 162 42 L 188 130 Z" fill="#ece8f5"></path>
+
+      <path d="M 196 130 L 222 18 L 250 130 Z" fill="#7c6bd6"></path>
+      <path d="M 220 24 L 222 18 L 224 24 L 222 36 Z" fill="#ece8f5" fill-opacity="0.55"></path>
+      <path d="M 258 130 L 282 46 L 308 130 Z" fill="#ece8f5"></path>
+      <path d="M 316 130 L 332 74 L 350 130 Z" fill="#c8c2dc"></path>
+
+      <path d="M 18 142 C 6 128, 4 108, 22 96 C 38 84, 64 86, 78 100 L 82 124 C 100 116, 130 112, 200 112 C 270 112, 300 116, 320 124 C 348 126, 372 122, 392 108 L 396 124 C 380 142, 358 152, 332 154 L 84 154 C 60 154, 36 152, 18 142 Z" fill="#ece8f5"></path>
+
+      <circle cx="38" cy="108" r="4" fill="#7c6bd6"></circle>
+
+      <path d="M 14 128 Q 26 132 42 120" stroke="#0a0a12" stroke-width="3" stroke-linecap="round" fill="none" stroke-opacity="0.75"></path>
+
+      <circle cx="22" cy="118" r="1.6" fill="#0a0a12" fill-opacity="0.7"></circle>
+
+      <rect x="110" y="148" width="18" height="22" rx="3" fill="#ece8f5"></rect>
+      <rect x="272" y="148" width="18" height="22" rx="3" fill="#ece8f5"></rect>
+    </g>
+
+
+    <g clip-path="url(#pageclip)">
+      <rect x="92" y="512" width="840" height="450" fill="#14141f"></rect>
+
+      <rect x="92" y="512" width="840" height="81" fill="#0a0a12"></rect>
+      <rect x="92" y="591" width="840" height="2" fill="#2a2a3a"></rect>
+
+      <circle cx="125" cy="552" r="7" fill="#7c6bd6"></circle>
+
+      <rect x="146" y="532" width="760" height="40" rx="20" fill="#22222f"></rect>
+
+      <rect x="134" y="640" width="665" height="12" rx="3" fill="#54546a"></rect>
+      <rect x="134" y="688" width="454" height="12" rx="3" fill="#7c6bd6"></rect>
+      <rect x="134" y="736" width="559" height="12" rx="3" fill="#3a3a4a"></rect>
+      <rect x="134" y="784" width="318" height="12" rx="3" fill="#3a3a4a"></rect>
+    </g>
+    <rect x="92" y="512" width="840" height="450" rx="42" fill="none" stroke="#2a2a3a" stroke-width="2"></rect>
+
+
+    <g clip-path="url(#ctrlclip)">
+      <rect x="574" y="697" width="389" height="266" fill="#1a1a26"></rect>
+
+      <rect x="714" y="713" width="109" height="14" rx="7" fill="#ece8f5" fill-opacity="0.25"></rect>
+
+      <circle cx="625" cy="800" r="31" fill="#7c6bd6"></circle>
+      <rect x="670" y="793" width="260" height="14" rx="7" fill="#2a2a3a"></rect>
+      <rect x="670" y="793" width="161" height="14" rx="7" fill="#7c6bd6"></rect>
+
+      <circle cx="625" cy="884" r="31" fill="#ece8f5" fill-opacity="0.85"></circle>
+      <rect x="670" y="877" width="260" height="14" rx="7" fill="#2a2a3a"></rect>
+      <rect x="670" y="877" width="83" height="14" rx="7" fill="#9b8cf0"></rect>
+    </g>
+    <rect x="574" y="697" width="389" height="266" rx="62" fill="none" stroke="#2a2a3a" stroke-width="2"></rect>
+  </g>
+</svg>

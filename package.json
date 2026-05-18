@@ -7,7 +7,8 @@
     "dev": "concurrently -k -n VITE,ELECTRON -c cyan,yellow \"vite\" \"wait-on http://localhost:8080 && electron .\"",
     "start": "vite build && electron .",
     "package:mac": "vite build && electron-builder --mac",
-    "package:win": "vite build && electron-builder --win"
+    "package:win": "vite build && electron-builder --win",
+    "build:icon": "node scripts/build-icon.js"
   },
   "build": {
     "appId": "com.browserator.app",
@@ -22,10 +23,27 @@
     ],
     "mac": {
       "identity": null,
-      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }]
+      "icon": "build/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
     },
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }]
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
     }
   },
   "dependencies": {
@@ -36,6 +54,7 @@
     "concurrently": "^8.2.2",
     "electron": "^29.1.4",
     "electron-builder": "^24.13.2",
+    "sharp": "^0.34.5",
     "vite": "^5.2.0",
     "wait-on": "^7.2.0"
   }
