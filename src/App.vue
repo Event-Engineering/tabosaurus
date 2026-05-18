@@ -2,18 +2,28 @@
   <div class="app">
     <header class="header">
       <div class="url-bar">
-        <input
-          v-model="urlInput"
-          @keyup.enter="openWindow"
-          placeholder="https://example.com"
-          class="url-input"
-          type="text"
-          spellcheck="false"
-          list="recent-urls"
-        />
-        <datalist id="recent-urls">
-          <option v-for="url in recentUrls" :key="url" :value="url" />
-        </datalist>
+        <div class="url-input-wrap">
+          <input
+            v-model="urlInput"
+            @keyup.enter="openWindow"
+            @focus="showSuggestions = true"
+            @blur="hideSuggestions"
+            @keydown="handleSuggestionsKey"
+            @input="suggestionIndex = -1"
+            placeholder="https://example.com"
+            class="url-input"
+            type="text"
+            spellcheck="false"
+          />
+          <ul v-if="showSuggestions && filteredRecentUrls.length" class="url-suggestions">
+            <li
+              v-for="(url, i) in filteredRecentUrls"
+              :key="url"
+              :class="{ active: i === suggestionIndex }"
+              @mousedown.prevent="selectSuggestion(url)"
+            >{{ url }}</li>
+          </ul>
+        </div>
         <select
           v-if="displays.length > 1"
           v-model="selectedDisplayId"
@@ -107,7 +117,15 @@ export default {
     const alwaysOnTop = ref(true)
     const interactiveWindowId = ref(null)
     const recentUrls = ref(JSON.parse(localStorage.getItem('recentUrls') || '[]'))
+    const showSuggestions = ref(false)
+    const suggestionIndex = ref(-1)
     const appVersion = ref('')
+
+    const filteredRecentUrls = computed(() => {
+      const q = urlInput.value.trim().toLowerCase()
+      if (!q) return recentUrls.value
+      return recentUrls.value.filter(u => u.toLowerCase().includes(q))
+    })
     let thumbTimer = null
     let unsubscribe = null
     let unsubDisplays = null
@@ -189,6 +207,33 @@ export default {
       const minH = Math.round(C * CARD_W + K) + MAIN_PAD + HEADER_H
       window.api.setMinimumSize(Math.round(minW) + chromeW, Math.round(minH) + chromeH)
       window.api.setContentSize(Math.round(w), Math.round(h))
+    }
+
+    function hideSuggestions() {
+      showSuggestions.value = false
+      suggestionIndex.value = -1
+    }
+
+    function selectSuggestion(url) {
+      urlInput.value = url
+      hideSuggestions()
+    }
+
+    function handleSuggestionsKey(e) {
+      const suggestions = filteredRecentUrls.value
+      if (!showSuggestions.value || !suggestions.length) return
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        suggestionIndex.value = Math.min(suggestionIndex.value + 1, suggestions.length - 1)
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        suggestionIndex.value = Math.max(suggestionIndex.value - 1, -1)
+      } else if (e.key === 'Escape') {
+        hideSuggestions()
+      } else if (e.key === 'Enter' && suggestionIndex.value >= 0) {
+        e.stopImmediatePropagation()
+        selectSuggestion(suggestions[suggestionIndex.value])
+      }
     }
 
     function saveRecentUrl(url) {
@@ -331,7 +376,8 @@ export default {
 
     return {
       urlInput, displays, selectedDisplayId, windows, thumbnails, movingWindow, alwaysOnTop, interactiveWindowId,
-      recentUrls, appVersion,
+      recentUrls, filteredRecentUrls, showSuggestions, suggestionIndex, appVersion,
+      hideSuggestions, selectSuggestion, handleSuggestionsKey,
       mainRef, gridStyle,
       displayById, openWindow, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
       setWindowVisibility, toggleAlwaysOnTop, startMove, doMove, toggleInteractive, interactClick, interactScroll, interactKey
@@ -360,8 +406,47 @@ export default {
   align-items: center;
 }
 
-.url-input {
+.url-input-wrap {
   flex: 1;
+  position: relative;
+  min-width: 0;
+}
+
+.url-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  list-style: none;
+  padding: 4px 0;
+  margin: 0;
+  z-index: 100;
+  max-height: 220px;
+  overflow-y: auto;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.url-suggestions li {
+  padding: 7px 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.url-suggestions li:hover,
+.url-suggestions li.active {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.url-input {
+  width: 100%;
   padding: 8px 12px;
   background: var(--bg-dark);
   border: 1px solid var(--border);
