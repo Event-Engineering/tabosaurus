@@ -13,7 +13,9 @@ An Electron app for opening and controlling fullscreen browser windows across mu
 - 🖱️ **Interactive mode** — click, scroll, and type directly via the thumbnail, like a tiny remote control for a browser that didn't ask to be remote-controlled
 - ⬛ Blackout / hide individual windows (for when the presenter walks away and leaves slides on screen)
 - ↔️ Move windows between displays without breaking a sweat
+- ⬅️ Back / forward navigation per window
 - 📌 Always-on-top control panel, because it knows it's more important than whatever you were doing
+- 🕑 URL history autocomplete — recently opened URLs suggested as you type
 - 💾 State persistence — windows reopen on next launch, whether you wanted them to or not
 
 ---

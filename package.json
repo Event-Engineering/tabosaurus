@@ -1,7 +1,11 @@
 {
   "name": "tabosaurus",
   "version": "1.0.0",
-  "description": "Controllable fullscreen browser with Vue 3 control UI",
+  "description": "Multi-display fullscreen browser controller",
+  "author": {
+    "name": "Event Engineering",
+    "email": "matt.james@event.engineering"
+  },
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently -k -n VITE,ELECTRON -c cyan,yellow \"vite\" \"wait-on http://localhost:8080 && electron .\"",

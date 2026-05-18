@@ -260,6 +260,8 @@ function restoreWindows() {
 
 // ── IPC: displays ─────────────────────────────────────────────
 
+ipcMain.handle('app:version', () => app.getVersion())
+
 ipcMain.handle('display:list', () => buildDisplayList())
 
 // ── IPC: control window ───────────────────────────────────────

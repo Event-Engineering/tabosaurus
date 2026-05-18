@@ -9,7 +9,11 @@
           class="url-input"
           type="text"
           spellcheck="false"
+          list="recent-urls"
         />
+        <datalist id="recent-urls">
+          <option v-for="url in recentUrls" :key="url" :value="url" />
+        </datalist>
         <select
           v-if="displays.length > 1"
           v-model="selectedDisplayId"
@@ -47,7 +51,8 @@
           </svg>
         </div>
         <p class="empty-title">No browser windows open</p>
-        <p class="empty-hint">Enter a URL above to open a fullscreen browser window</p>
+        <p class="empty-hint">Enter a URL above to open a fullscreen browser window on any connected display</p>
+        <p class="empty-version" v-if="appVersion">v{{ appVersion }}</p>
       </div>
 
       <div v-else class="window-grid" :style="gridStyle">
@@ -101,6 +106,8 @@ export default {
     const movingWindow = ref(null)
     const alwaysOnTop = ref(true)
     const interactiveWindowId = ref(null)
+    const recentUrls = ref(JSON.parse(localStorage.getItem('recentUrls') || '[]'))
+    const appVersion = ref('')
     let thumbTimer = null
     let unsubscribe = null
     let unsubDisplays = null
@@ -184,7 +191,14 @@ export default {
       window.api.setContentSize(Math.round(w), Math.round(h))
     }
 
+    function saveRecentUrl(url) {
+      const list = [url, ...recentUrls.value.filter(u => u !== url)].slice(0, 10)
+      recentUrls.value = list
+      localStorage.setItem('recentUrls', JSON.stringify(list))
+    }
+
     async function init() {
+      appVersion.value = await window.api.getVersion()
       displays.value = await window.api.listDisplays()
       const defaultDisplay = displays.value.find(d => !d.isPrimary) || displays.value[0]
       if (defaultDisplay) selectedDisplayId.value = defaultDisplay.id
@@ -222,6 +236,7 @@ export default {
       let url = urlInput.value.trim()
       if (!url) return
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url
+      saveRecentUrl(url)
       await window.api.openWindow(url, selectedDisplayId.value)
       urlInput.value = ''
     }
@@ -316,6 +331,7 @@ export default {
 
     return {
       urlInput, displays, selectedDisplayId, windows, thumbnails, movingWindow, alwaysOnTop, interactiveWindowId,
+      recentUrls, appVersion,
       mainRef, gridStyle,
       displayById, openWindow, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
       setWindowVisibility, toggleAlwaysOnTop, startMove, doMove, toggleInteractive, interactClick, interactScroll, interactKey
@@ -462,6 +478,13 @@ export default {
 
 .empty-hint {
   font-size: 12px;
+}
+
+.empty-version {
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.45;
+  margin-top: 8px;
 }
 
 .window-grid {
