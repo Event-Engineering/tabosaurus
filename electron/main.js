@@ -379,7 +379,19 @@ ipcMain.handle('window:move', async (_, { id, displayId }) => {
   await enterFullscreen(data.win)
 
   data.displayId = displayId
+
+  if (data.alwaysOnTop) {
+    const conflictOnDest = Array.from(browserWindows.values()).some(
+      d => d !== data && d.displayId === displayId && d.alwaysOnTop
+    )
+    if (conflictOnDest) {
+      data.alwaysOnTop = false
+      data.win.setAlwaysOnTop(false)
+    }
+  }
+
   notifyControlWindow()
+  saveState()
 })
 
 ipcMain.handle('window:thumbnail', async (_, { id }) => {
