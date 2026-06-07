@@ -182,9 +182,9 @@ export default {
 
       const W = containerW.value  // contentRect already excludes .main padding
       const H = containerH.value
-      const GAP = 16
+      const GAP = 20
 
-      const C = effectiveC(), K = 21
+      const C = effectiveC(), K = 15
 
       // Minimum card width: action row has 5 labelled buttons + 1 icon-only close.
       // At 10px font floor the row needs ~330px; 340 gives comfortable breathing room.
@@ -200,7 +200,7 @@ export default {
       // Max card width where all rows fit without scrolling.
       // Each row height = maxC_i × cardW + K, so: sum(maxC_i) × cardW + rows×K + gaps ≤ H
       const sumC = rowMaxCs(cols).reduce((a, b) => a + b, 0)
-      const maxCardW = (H - 4 - K * rows - GAP * (rows - 1)) / sumC
+      const maxCardW = (H - K * rows - GAP * (rows - 1)) / sumC
 
       // Use whichever is smaller: filling the grid width, or the height-constrained max
       const cardW = Math.min((W - GAP * (cols - 1)) / cols, maxCardW)
@@ -215,7 +215,7 @@ export default {
 
     function fitWindowToCards(n) {
       const count = Math.max(n, 1)
-      const GAP = 16, K = 21, MAIN_PAD = 40
+      const GAP = 20, K = 15, MAIN_PAD = 40
       const C = effectiveC()
 
       // Target ~27% of the primary display width per card
@@ -688,7 +688,7 @@ export default {
 
 .window-grid {
   display: grid;
-  gap: 16px;
+  gap: 20px;
   align-content: start;
   margin: 0 auto;
   width: 100%;
