@@ -88,6 +88,7 @@
           @pin="handlePin(win.id)"
           :settings="{ ...(windowSettings[win.id] || { autoReload: false, reloadInterval: 30 }), reloadStartedAt: reloadCycleStarts[win.id] }"
           @set-reload="({ enabled, interval }) => handleSetReload(win.id, enabled, interval)"
+          @apply-css="({ css }) => handleApplyCss(win.id, css)"
         />
       </div>
     </main>
@@ -315,6 +316,10 @@ export default {
       await window.api.setWindowAlwaysOnTop(id, !win.alwaysOnTop)
     }
 
+    async function handleApplyCss(id, css) {
+      await window.api.injectCSS(id, css)
+    }
+
     function handleSetReload(id, enabled, interval) {
       interval = Math.max(1, interval || 1)
       const win = windows.value.find(w => w.id === id)
@@ -485,7 +490,7 @@ export default {
       windowSettings, reloadCycleStarts,
       displayById, openWindow, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
       setWindowVisibility, toggleAlwaysOnTop, startMove, doMove, toggleInteractive, interactClick, interactScroll, interactKey,
-      handlePin, handleSetReload
+      handlePin, handleSetReload, handleApplyCss
     }
   }
 }

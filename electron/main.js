@@ -90,7 +90,8 @@ function buildWindowList() {
     hidden: data.hidden,
     canGoBack: data.canGoBack,
     canGoForward: data.canGoForward,
-    alwaysOnTop: data.alwaysOnTop
+    alwaysOnTop: data.alwaysOnTop,
+    customCSS: data.customCSS
   }))
 }
 
@@ -143,7 +144,8 @@ function saveState() {
     windows: Array.from(browserWindows.values()).map(d => ({
       url: d.url,
       displayId: d.displayId,
-      alwaysOnTop: d.alwaysOnTop
+      alwaysOnTop: d.alwaysOnTop,
+      customCSS: d.customCSS
     }))
   }
   try {
@@ -163,7 +165,7 @@ function loadState() {
 
 // ── Window factory ────────────────────────────────────────────
 
-function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false } = {}) {
+function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false, customCSS = '' } = {}) {
   const allDisplays = screen.getAllDisplays()
   const display = allDisplays.find(d => d.id === displayId) || screen.getPrimaryDisplay()
 
@@ -191,7 +193,7 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
   }
 
   const id = nextId++
-  browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden, alwaysOnTop, canGoBack: false, canGoForward: false })
+  browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden, alwaysOnTop, customCSS, cssKey: null, canGoBack: false, canGoForward: false })
 
   if (alwaysOnTop && !hidden) {
     if (process.platform === 'darwin') win.setAlwaysOnTop(true, 'screen-saver')
@@ -210,11 +212,16 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
   win.webContents.on('did-navigate', (_, newUrl) => updateNavState(newUrl))
   win.webContents.on('did-navigate-in-page', (_, newUrl) => updateNavState(newUrl))
 
-  win.webContents.on('did-finish-load', () => {
+  win.webContents.on('did-finish-load', async () => {
     if (win.isDestroyed()) return
-    win.webContents.insertCSS(HIDE_SCROLLBARS_CSS).catch(() => {})
     const data = browserWindows.get(id)
-    if (data && data.blackout) applyBlackout(win)
+    if (!data) return
+    data.cssKey = null
+    await win.webContents.insertCSS(HIDE_SCROLLBARS_CSS).catch(() => {})
+    if (data.customCSS) {
+      data.cssKey = await win.webContents.insertCSS(data.customCSS).catch(() => null)
+    }
+    if (data.blackout) applyBlackout(win)
   })
 
   win.on('closed', () => {
@@ -257,9 +264,9 @@ function restoreWindows() {
 
   const currentDisplayIds = new Set(screen.getAllDisplays().map(d => d.id))
 
-  for (const { url, displayId, alwaysOnTop } of state.windows) {
+  for (const { url, displayId, alwaysOnTop, customCSS } of state.windows) {
     const hidden = !currentDisplayIds.has(displayId)
-    openBrowserWindow(url, displayId, { hidden, alwaysOnTop: !hidden && !!alwaysOnTop })
+    openBrowserWindow(url, displayId, { hidden, alwaysOnTop: !hidden && !!alwaysOnTop, customCSS: customCSS || '' })
   }
 
   notifyControlWindow()
@@ -521,6 +528,21 @@ ipcMain.handle('window:alwaysOnTop', (_, { id, enabled }) => {
     data.win.setAlwaysOnTop(enabled, 'screen-saver')
   } else {
     data.win.setAlwaysOnTop(enabled)
+  }
+  notifyControlWindow()
+  saveState()
+})
+
+ipcMain.handle('window:injectCSS', async (_, { id, css }) => {
+  const data = browserWindows.get(id)
+  if (!data || data.win.isDestroyed()) return
+  if (data.cssKey) {
+    await data.win.webContents.removeInsertedCSS(data.cssKey).catch(() => {})
+    data.cssKey = null
+  }
+  data.customCSS = css
+  if (css) {
+    data.cssKey = await data.win.webContents.insertCSS(css).catch(() => null)
   }
   notifyControlWindow()
   saveState()

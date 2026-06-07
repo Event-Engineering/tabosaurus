@@ -149,6 +149,27 @@
               @keydown.enter="$event.target.blur()"
             />
           </label>
+          <div class="wc-popover-divider"></div>
+          <div class="wc-popover-row">
+            <div class="wc-popover-title">Inject CSS</div>
+            <button
+              class="wc-switch"
+              :class="{ 'wc-switch-on': win.customCSS }"
+              @click="toggleCSSEnabled"
+              :title="win.customCSS ? 'Remove injected CSS' : 'Apply CSS'"
+              role="switch"
+              :aria-checked="!!win.customCSS"
+            ><span class="wc-switch-thumb"></span></button>
+          </div>
+          <textarea
+            v-model="localCss"
+            class="wc-css-textarea"
+            spellcheck="false"
+            placeholder="body { background: #000; }"
+          ></textarea>
+          <div class="wc-popover-footer">
+            <button v-if="localCss" class="wc-popover-btn wc-popover-clear" @click="clearCss">Clear</button>
+          </div>
         </div>
       </template>
     </Teleport>
@@ -222,7 +243,7 @@
         ref="cogBtnRef"
         @click="togglePopover()"
         class="action-btn action-btn-close"
-        :class="{ 'action-btn-cog-active': settings.autoReload }"
+        :class="{ 'action-btn-cog-active': settings.autoReload || win.customCSS }"
         title="Advanced settings"
       >
         <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -252,7 +273,7 @@ export default {
     interactive: { type: Boolean, default: false },
     settings: { type: Object, default: () => ({ autoReload: false, reloadInterval: 30 }) }
   },
-  emits: ['refresh', 'move', 'close', 'navigate', 'back', 'forward', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key', 'toggle-interactive', 'pin', 'set-reload'],
+  emits: ['refresh', 'move', 'close', 'navigate', 'back', 'forward', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key', 'toggle-interactive', 'pin', 'set-reload', 'apply-css'],
   setup(props, { emit }) {
     const editing = ref(false)
     const editUrl = ref('')
@@ -362,6 +383,7 @@ export default {
 
     // ── Advanced: popovers ────────────────────────────────────────
     const openPopover = ref(false)
+    const localCss = ref('')
     const localInterval = ref(30)
     const localIntervalText = ref('0:30')
     const cogBtnRef = ref(null)
@@ -400,10 +422,24 @@ export default {
         const rect = cogBtnRef.value.getBoundingClientRect()
         popoverPos.value = { bottom: window.innerHeight - rect.top + 6, right: window.innerWidth - rect.right }
       }
+      if (!localCss.value && props.win.customCSS) localCss.value = props.win.customCSS
       localInterval.value = props.settings?.reloadInterval ?? 30
       localIntervalText.value = formatDuration(localInterval.value)
       openPopover.value = true
     }
+
+    function toggleCSSEnabled() {
+      emit('apply-css', { css: props.win.customCSS ? '' : localCss.value })
+    }
+
+    function clearCss() {
+      localCss.value = ''
+      emit('apply-css', { css: '' })
+    }
+
+    watch(() => props.win.customCSS, (val) => {
+      if (!localCss.value && val) localCss.value = val
+    })
 
     function onIntervalChange() {
       localInterval.value = Math.max(1, localInterval.value || 1)
@@ -442,8 +478,8 @@ export default {
     )
 
     return { editing, editUrl, urlInputRef, startEdit, confirmEdit, cancelEdit, onThumbnailClick, onThumbnailScroll, typing, typeBuffer, typeInputRef, onTypeKeydown,
-      openPopover, localInterval, localIntervalText, cogBtnRef, popoverStyle, countdown,
-      togglePopover, onIntervalBlur, toggleAutoReload, formatDuration }
+      openPopover, localCss, localInterval, localIntervalText, cogBtnRef, popoverStyle, countdown,
+      togglePopover, toggleCSSEnabled, clearCss, onIntervalBlur, toggleAutoReload, formatDuration }
   }
 }
 </script>
@@ -1016,5 +1052,66 @@ export default {
 .wc-switch-on .wc-switch-thumb {
   transform: translateX(16px);
   background: #0d1117;
+}
+
+.wc-popover-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+.wc-css-textarea {
+  width: 100%;
+  min-width: 240px;
+  height: 110px;
+  padding: 8px 10px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.wc-css-textarea:focus {
+  border-color: var(--accent);
+}
+
+.wc-css-textarea::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.5;
+}
+
+.wc-popover-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.wc-popover-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+}
+
+.wc-popover-clear {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.wc-popover-clear:hover {
+  background: rgba(248, 81, 73, 0.1);
+  border-color: rgba(248, 81, 73, 0.4);
+  color: var(--danger);
 }
 </style>
