@@ -21,7 +21,14 @@
               :key="url"
               :class="{ active: i === suggestionIndex }"
               @mousedown.prevent="selectSuggestion(url)"
-            >{{ url }}</li>
+            >
+              <span class="suggestion-url">{{ url }}</span>
+              <button class="suggestion-delete" @mousedown.prevent.stop="removeRecentUrl(url)" title="Remove from history">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </li>
           </ul>
         </div>
         <select
@@ -384,6 +391,12 @@ export default {
       localStorage.setItem('recentUrls', JSON.stringify(list))
     }
 
+    function removeRecentUrl(url) {
+      const list = recentUrls.value.filter(u => u !== url)
+      recentUrls.value = list
+      localStorage.setItem('recentUrls', JSON.stringify(list))
+    }
+
     async function init() {
       appVersion.value = await window.api.getVersion()
       displays.value = await window.api.listDisplays()
@@ -553,7 +566,7 @@ export default {
     return {
       urlInput, displays, selectedDisplayId, windows, thumbnails, movingWindow, alwaysOnTop, interactiveWindowId,
       recentUrls, filteredRecentUrls, showSuggestions, suggestionIndex, appVersion,
-      hideSuggestions, selectSuggestion, handleSuggestionsKey,
+      hideSuggestions, selectSuggestion, handleSuggestionsKey, removeRecentUrl,
       mainRef, gridStyle,
       windowSettings, reloadCycleStarts,
       displayById, openWindow, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
@@ -612,15 +625,48 @@ export default {
   font-size: 13px;
   color: var(--text-secondary);
   cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .url-suggestions li:hover,
 .url-suggestions li.active {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.suggestion-url {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.suggestion-delete {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s, color 0.1s;
+}
+
+.url-suggestions li:hover .suggestion-delete,
+.url-suggestions li.active .suggestion-delete {
+  opacity: 1;
+}
+
+.suggestion-delete:hover {
+  background: rgba(248, 81, 73, 0.15);
+  color: var(--danger);
 }
 
 .url-input {
