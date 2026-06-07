@@ -504,12 +504,12 @@ ipcMain.handle('window:sendKey', (_, { id, key, modifiers }) => {
 
 ipcMain.handle('window:goBack', (_, { id }) => {
   const data = browserWindows.get(id)
-  if (data && !data.win.isDestroyed() && data.win.webContents.navigationHistory.canGoBack()) data.win.webContents.goBack()
+  if (data && !data.win.isDestroyed() && data.win.webContents.navigationHistory.canGoBack()) data.win.webContents.navigationHistory.goBack()
 })
 
 ipcMain.handle('window:goForward', (_, { id }) => {
   const data = browserWindows.get(id)
-  if (data && !data.win.isDestroyed() && data.win.webContents.navigationHistory.canGoForward()) data.win.webContents.goForward()
+  if (data && !data.win.isDestroyed() && data.win.webContents.navigationHistory.canGoForward()) data.win.webContents.navigationHistory.goForward()
 })
 
 ipcMain.handle('window:alwaysOnTop', (_, { id, enabled }) => {
