@@ -204,8 +204,8 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
     const d = browserWindows.get(id)
     if (!d) return
     if (newUrl) d.url = newUrl
-    d.canGoBack = win.webContents.canGoBack()
-    d.canGoForward = win.webContents.canGoForward()
+    d.canGoBack = win.webContents.navigationHistory.canGoBack()
+    d.canGoForward = win.webContents.navigationHistory.canGoForward()
     notifyControlWindow()
   }
 
@@ -244,7 +244,7 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
       .then(() => win.loadURL(url))
       .then(() => {
         if (!win.isDestroyed()) {
-          win.webContents.clearHistory()
+          win.webContents.navigationHistory.clear()
           updateNavState()
         }
       })
@@ -504,12 +504,12 @@ ipcMain.handle('window:sendKey', (_, { id, key, modifiers }) => {
 
 ipcMain.handle('window:goBack', (_, { id }) => {
   const data = browserWindows.get(id)
-  if (data && !data.win.isDestroyed() && data.win.webContents.canGoBack()) data.win.webContents.goBack()
+  if (data && !data.win.isDestroyed() && data.win.webContents.navigationHistory.canGoBack()) data.win.webContents.goBack()
 })
 
 ipcMain.handle('window:goForward', (_, { id }) => {
   const data = browserWindows.get(id)
-  if (data && !data.win.isDestroyed() && data.win.webContents.canGoForward()) data.win.webContents.goForward()
+  if (data && !data.win.isDestroyed() && data.win.webContents.navigationHistory.canGoForward()) data.win.webContents.goForward()
 })
 
 ipcMain.handle('window:alwaysOnTop', (_, { id, enabled }) => {
