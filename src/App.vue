@@ -176,6 +176,23 @@ export default {
       return result
     }
 
+    // Like rowMaxCs but returns only the display aspect ratio per row (no C_BODY).
+    // Used for the large-card height constraint where controls are at their clamp() caps.
+    function rowMaxAspects(cols) {
+      const n = windows.value.length
+      const count = Math.max(n, 1)
+      const rows = Math.ceil(count / cols)
+      const result = []
+      for (let r = 0; r < rows; r++) {
+        let maxA = -Infinity
+        for (let c = 0; c < cols && r * cols + c < n; c++) {
+          maxA = Math.max(maxA, cardAspectC(windows.value[r * cols + c]))
+        }
+        result.push(maxA === -Infinity ? 9 / 16 : maxA)
+      }
+      return result
+    }
+
     function computeCols(n, W, H) {
       const C = effectiveC()
       const GAP = 20, MIN_CARD_W = 410
@@ -186,22 +203,26 @@ export default {
 
     const gridStyle = computed(() => {
       const n = windows.value.length
-      if (n === 0 || !containerW.value) return {}
+      if (n === 0 || !containerW.value || !containerH.value) return {}
 
-      const W = containerW.value  // contentRect already excludes .main padding
+      const W = containerW.value
       const H = containerH.value
       const GAP = 20, K = 15
 
       const cols = computeCols(n, W, H)
-
       const rows = Math.ceil(n / cols)
 
-      // Max card width where all rows fit without scrolling.
-      // Each row height = maxC_i × cardW + K, so: sum(maxC_i) × cardW + rows×K + gaps ≤ H
+      // Two height models for maxCardW:
+      // 1. Proportional (accurate at small card widths): controls scale with cqw, C includes C_BODY
+      // 2. Capped (accurate at large card widths): controls hit clamp() caps ~85px, C is just display aspect
+      // Take the less restrictive (larger maxCardW) — the controls will actually fit.
       const sumC = rowMaxCs(cols).reduce((a, b) => a + b, 0)
-      const maxCardW = (H - K * rows - GAP * (rows - 1)) / sumC
+      const sumAspect = rowMaxAspects(cols).reduce((a, b) => a + b, 0)
+      const maxCardW = Math.max(
+        (H - K * rows - GAP * (rows - 1)) / sumC,
+        (H - 85 * rows - GAP * (rows - 1)) / sumAspect
+      )
 
-      // Use whichever is smaller: filling the grid width, or the height-constrained max
       const cardW = Math.min((W - GAP * (cols - 1)) / cols, maxCardW)
       const maxW = Math.round(cols * cardW + GAP * (cols - 1))
 
