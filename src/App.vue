@@ -178,7 +178,7 @@ export default {
 
     function computeCols(n, W, H) {
       const C = effectiveC()
-      const GAP = 20, MIN_CARD_W = 340
+      const GAP = 20, MIN_CARD_W = 410
       let cols = Math.max(1, Math.min(n, Math.round(Math.sqrt(n * W / H / (1 / C)))))
       while (cols > 1 && (W - GAP * (cols - 1)) / cols < MIN_CARD_W) cols--
       return cols
@@ -212,9 +212,40 @@ export default {
       return displays.value.find(d => d.id === id) || null
     }
 
-    function fitWindowToCards(n, savedCardW = null) {
+    function headerFixedW() {
+      const headerEl = document.querySelector('.header')
+      const urlBar = headerEl?.querySelector('.url-bar')
+      return urlBar
+        ? Array.from(urlBar.children)
+            .filter(el => !el.matches('.url-input-wrap'))
+            .reduce((sum, el) => sum + el.offsetWidth, 0)
+          + (urlBar.children.length - 1) * 8
+          + 32
+          + 120
+        : 500
+    }
+
+    function updateMinimumSize() {
+      const n = windows.value.length
+      if (!n || !containerW.value || !containerH.value) return
+      const GAP = 20, K = 15, MAIN_PAD = 40, MIN_CARD_W = 410
+      const headerEl = document.querySelector('.header')
+      const HEADER_H = headerEl ? headerEl.offsetHeight : 64
+
+      const cols = computeCols(n, containerW.value, containerH.value)
+      const rows = Math.ceil(n / cols)
+      const sumC = rowMaxCs(cols).reduce((a, b) => a + b, 0)
+
+      const chromeW = window.outerWidth - window.innerWidth
+      const chromeH = window.outerHeight - window.innerHeight
+      const minW = Math.max(cols * MIN_CARD_W + (cols - 1) * GAP + MAIN_PAD, headerFixedW())
+      const minH = Math.round(sumC * MIN_CARD_W + rows * K + (rows - 1) * GAP) + MAIN_PAD + HEADER_H
+      window.api.setMinimumSize(Math.round(minW) + chromeW, Math.round(minH) + chromeH)
+    }
+
+    function fitWindowToCards(n, savedCardW = null, prevCount = 0, savedCols = 0) {
       const count = Math.max(n, 1)
-      const GAP = 20, K = 15, MAIN_PAD = 40
+      const GAP = 20, K = 15, MAIN_PAD = 40, MIN_CARD_W = 410
 
       const primary = displays.value.find(d => d.isPrimary) || displays.value[0]
       const defaultCardW = primary ? Math.round(primary.bounds.width * 0.27) : 480
@@ -225,27 +256,24 @@ export default {
       const headerEl = document.querySelector('.header')
       const HEADER_H = headerEl ? headerEl.offsetHeight : 64
 
-      // Minimum width the header needs: sum the fixed (non-flex) children
-      const urlBar = headerEl?.querySelector('.url-bar')
-      const fixedW = urlBar
-        ? Array.from(urlBar.children)
-            .filter(el => !el.matches('.url-input-wrap'))
-            .reduce((sum, el) => sum + el.offsetWidth, 0)
-          + (urlBar.children.length - 1) * 8   // gaps
-          + 32                                  // header padding (16px × 2)
-          + 120                                 // minimum for the url input itself
-        : 500
-
-      const cols = Math.max(1, Math.min(count, Math.round(Math.sqrt(count))))
+      // When removing windows, preserve the previous column count (capped at new window count)
+      // so the window doesn't unnecessarily collapse to fewer columns.
+      // When adding, use the sqrt heuristic for a balanced layout.
+      const cols = (n < prevCount && savedCols > 0)
+        ? Math.max(1, Math.min(savedCols, count))
+        : Math.max(1, Math.min(count, Math.round(Math.sqrt(count))))
       const rows = Math.ceil(count / cols)
       const rowCs = rowMaxCs(cols)
       const sumC = rowCs.reduce((a, b) => a + b, 0)
-      const w = Math.max(cols * CARD_W + (cols - 1) * GAP + MAIN_PAD, fixedW)
+      const w = Math.max(cols * CARD_W + (cols - 1) * GAP + MAIN_PAD, headerFixedW())
       const h = sumC * CARD_W + rows * K + (rows - 1) * GAP + MAIN_PAD + HEADER_H
+
+      // Update minimum BEFORE setContentSize — Electron silently rejects a resize that
+      // falls below the current minimum, so the new minimum must be applied first.
       const chromeW = window.outerWidth - window.innerWidth
       const chromeH = window.outerHeight - window.innerHeight
-      const minW = Math.max(CARD_W + MAIN_PAD, fixedW, 340 + MAIN_PAD)
-      const minH = Math.round(rowCs[0] * CARD_W + K) + MAIN_PAD + HEADER_H
+      const minW = Math.max(cols * MIN_CARD_W + (cols - 1) * GAP + MAIN_PAD, headerFixedW())
+      const minH = Math.round(sumC * MIN_CARD_W + rows * K + (rows - 1) * GAP) + MAIN_PAD + HEADER_H
       window.api.setMinimumSize(Math.round(minW) + chromeW, Math.round(minH) + chromeH)
       window.api.setContentSize(Math.round(w), Math.round(h))
     }
@@ -352,14 +380,14 @@ export default {
 
         // Capture current card width BEFORE updating windows.value so effectiveC / rowMaxCs
         // still reflect the previous layout when we compute it.
-        let savedCardW = null
+        let savedCardW = null, savedCols = 0
         if (prevCount > 0 && containerW.value > 0 && containerH.value > 0) {
           const GAP = 20, K = 15
-          const cols = computeCols(prevCount, containerW.value, containerH.value)
-          const rows = Math.ceil(prevCount / cols)
-          const sumC = rowMaxCs(cols).reduce((a, b) => a + b, 0)
+          savedCols = computeCols(prevCount, containerW.value, containerH.value)
+          const rows = Math.ceil(prevCount / savedCols)
+          const sumC = rowMaxCs(savedCols).reduce((a, b) => a + b, 0)
           const maxCW = (containerH.value - K * rows - GAP * (rows - 1)) / sumC
-          const cw = Math.min((containerW.value - GAP * (cols - 1)) / cols, maxCW)
+          const cw = Math.min((containerW.value - GAP * (savedCols - 1)) / savedCols, maxCW)
           if (cw >= 200) savedCardW = Math.round(cw)
         }
 
@@ -373,7 +401,7 @@ export default {
         windowSettings.value = nextSettings
         windows.value = updated
         const displayChanged = updated.some(w => prevDisplayById.get(w.id) !== w.displayId)
-        if (updated.length !== prevCount || displayChanged) fitWindowToCards(updated.length, savedCardW)
+        if (updated.length !== prevCount || displayChanged) fitWindowToCards(updated.length, savedCardW, prevCount, savedCols)
         for (const win of updated) {
           if (!prevIds.has(win.id)) initWindowSettings(win)
         }
@@ -488,6 +516,7 @@ export default {
       resizeObserver = new ResizeObserver(([entry]) => {
         containerW.value = entry.contentRect.width
         containerH.value = entry.contentRect.height
+        updateMinimumSize()
       })
       if (mainRef.value) resizeObserver.observe(mainRef.value)
     })
@@ -665,7 +694,7 @@ export default {
 
 .main {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 20px;
 }
 
