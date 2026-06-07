@@ -375,10 +375,6 @@ ipcMain.handle('window:move', async (_, { id, displayId }) => {
   if (!display) return
 
   await exitFullscreen(data.win)
-  data.win.setBounds(display.bounds)
-  await enterFullscreen(data.win)
-
-  data.displayId = displayId
 
   if (data.alwaysOnTop) {
     const conflictOnDest = Array.from(browserWindows.values()).some(
@@ -389,6 +385,11 @@ ipcMain.handle('window:move', async (_, { id, displayId }) => {
       data.win.setAlwaysOnTop(false)
     }
   }
+
+  data.win.setBounds(display.bounds)
+  await enterFullscreen(data.win)
+
+  data.displayId = displayId
 
   notifyControlWindow()
   saveState()
