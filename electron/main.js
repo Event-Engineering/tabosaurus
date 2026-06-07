@@ -89,7 +89,8 @@ function buildWindowList() {
     blackout: data.blackout,
     hidden: data.hidden,
     canGoBack: data.canGoBack,
-    canGoForward: data.canGoForward
+    canGoForward: data.canGoForward,
+    alwaysOnTop: data.alwaysOnTop
   }))
 }
 
@@ -141,7 +142,8 @@ function saveState() {
   const state = {
     windows: Array.from(browserWindows.values()).map(d => ({
       url: d.url,
-      displayId: d.displayId
+      displayId: d.displayId,
+      alwaysOnTop: d.alwaysOnTop
     }))
   }
   try {
@@ -161,7 +163,7 @@ function loadState() {
 
 // ── Window factory ────────────────────────────────────────────
 
-function openBrowserWindow(url, displayId, { hidden = false } = {}) {
+function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false } = {}) {
   const allDisplays = screen.getAllDisplays()
   const display = allDisplays.find(d => d.id === displayId) || screen.getPrimaryDisplay()
 
@@ -189,7 +191,12 @@ function openBrowserWindow(url, displayId, { hidden = false } = {}) {
   }
 
   const id = nextId++
-  browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden, canGoBack: false, canGoForward: false })
+  browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden, alwaysOnTop, canGoBack: false, canGoForward: false })
+
+  if (alwaysOnTop && !hidden) {
+    if (process.platform === 'darwin') win.setAlwaysOnTop(true, 'screen-saver')
+    else win.setAlwaysOnTop(true)
+  }
 
   function updateNavState(newUrl) {
     const d = browserWindows.get(id)
@@ -250,9 +257,9 @@ function restoreWindows() {
 
   const currentDisplayIds = new Set(screen.getAllDisplays().map(d => d.id))
 
-  for (const { url, displayId } of state.windows) {
+  for (const { url, displayId, alwaysOnTop } of state.windows) {
     const hidden = !currentDisplayIds.has(displayId)
-    openBrowserWindow(url, displayId, { hidden })
+    openBrowserWindow(url, displayId, { hidden, alwaysOnTop: !hidden && !!alwaysOnTop })
   }
 
   notifyControlWindow()
@@ -496,6 +503,27 @@ ipcMain.handle('window:goBack', (_, { id }) => {
 ipcMain.handle('window:goForward', (_, { id }) => {
   const data = browserWindows.get(id)
   if (data && !data.win.isDestroyed() && data.win.webContents.canGoForward()) data.win.webContents.goForward()
+})
+
+ipcMain.handle('window:alwaysOnTop', (_, { id, enabled }) => {
+  const data = browserWindows.get(id)
+  if (!data || data.win.isDestroyed()) return
+  if (enabled) {
+    for (const [otherId, otherData] of browserWindows.entries()) {
+      if (otherId !== id && otherData.displayId === data.displayId && otherData.alwaysOnTop) {
+        otherData.alwaysOnTop = false
+        if (!otherData.win.isDestroyed()) otherData.win.setAlwaysOnTop(false)
+      }
+    }
+  }
+  data.alwaysOnTop = enabled
+  if (process.platform === 'darwin') {
+    data.win.setAlwaysOnTop(enabled, 'screen-saver')
+  } else {
+    data.win.setAlwaysOnTop(enabled)
+  }
+  notifyControlWindow()
+  saveState()
 })
 
 ipcMain.handle('window:sendScroll', (_, { id, normX, normY, deltaX, deltaY }) => {

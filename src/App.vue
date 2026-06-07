@@ -85,6 +85,7 @@
           @interact-click="(normX, normY, cb) => interactClick(win.id, normX, normY, cb)"
           @interact-scroll="(normX, normY, deltaX, deltaY) => interactScroll(win.id, normX, normY, deltaX, deltaY)"
           @interact-key="(key, modifiers, cb) => interactKey(win.id, key, modifiers, cb)"
+          @pin="handlePin(win.id)"
         />
       </div>
     </main>
@@ -270,6 +271,12 @@ export default {
       }
     }
 
+    async function handlePin(id) {
+      const win = windows.value.find(w => w.id === id)
+      if (!win) return
+      await window.api.setWindowAlwaysOnTop(id, !win.alwaysOnTop)
+    }
+
     function saveRecentUrl(url) {
       const list = [url, ...recentUrls.value.filter(u => u !== url)].slice(0, 10)
       recentUrls.value = list
@@ -414,7 +421,8 @@ export default {
       hideSuggestions, selectSuggestion, handleSuggestionsKey,
       mainRef, gridStyle,
       displayById, openWindow, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
-      setWindowVisibility, toggleAlwaysOnTop, startMove, doMove, toggleInteractive, interactClick, interactScroll, interactKey
+      setWindowVisibility, toggleAlwaysOnTop, startMove, doMove, toggleInteractive, interactClick, interactScroll, interactKey,
+      handlePin
     }
   }
 }

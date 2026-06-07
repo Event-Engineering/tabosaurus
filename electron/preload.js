@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('api', {
   setContentSize: (w, h) => ipcRenderer.invoke('control:setContentSize', { w, h }),
   setMinimumSize: (w, h) => ipcRenderer.invoke('control:setMinimumSize', { w, h }),
   setAlwaysOnTop: (enabled) => ipcRenderer.invoke('control:alwaysontop', { enabled }),
+  setWindowAlwaysOnTop: (id, enabled) => ipcRenderer.invoke('window:alwaysOnTop', { id, enabled }),
   onWindowsUpdated: (callback) => {
     const handler = (_, windows) => callback(windows)
     ipcRenderer.on('windows:updated', handler)

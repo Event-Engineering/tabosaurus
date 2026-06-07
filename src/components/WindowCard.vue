@@ -41,6 +41,19 @@
         <span class="type-hint">Esc to stop</span>
       </div>
 
+      <!-- Pin badge -->
+      <button
+        class="pin-badge"
+        :class="{ 'pin-active': win.alwaysOnTop }"
+        @click.stop="$emit('pin')"
+        :title="win.alwaysOnTop ? 'Unpin (disable always-on-top)' : 'Pin on top of all windows'"
+      >
+        <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="17" x2="12" y2="22"></line>
+          <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17z"></path>
+        </svg>
+      </button>
+
       <!-- Interactive mode indicator -->
       <div v-if="interactive" class="interactive-badge">
         <span class="interactive-dot"></span>Live
@@ -190,7 +203,7 @@ export default {
     display: { type: Object, default: null },
     interactive: { type: Boolean, default: false }
   },
-  emits: ['refresh', 'move', 'close', 'navigate', 'back', 'forward', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key', 'toggle-interactive'],
+  emits: ['refresh', 'move', 'close', 'navigate', 'back', 'forward', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key', 'toggle-interactive', 'pin'],
   setup(props, { emit }) {
     const editing = ref(false)
     const editUrl = ref('')
@@ -713,5 +726,42 @@ export default {
 .action-btn-close {
   flex: none;
   padding: 1.5cqw;
+}
+
+/* Pin badge */
+.pin-badge {
+  position: absolute;
+  top: 1.5cqw;
+  right: 1.5cqw;
+  z-index: 10;
+  width: 5.5cqw;
+  height: 5.5cqw;
+  min-width: 20px;
+  min-height: 20px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  color: rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3cqw;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.pin-badge:hover {
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.pin-active {
+  color: var(--accent);
+  background: rgba(157, 119, 245, 0.2);
+}
+
+.pin-active:hover {
+  color: var(--accent);
+  background: rgba(157, 119, 245, 0.32);
 }
 </style>
