@@ -6,6 +6,17 @@ let controlWindow = null
 const browserWindows = new Map() // id -> { win, url, displayId, blackout, hidden }
 let nextId = 1
 
+// Ensures the control window sits above any browser window that was just raised.
+// On macOS this is a no-op — level hierarchy ('screen-saver' > 'floating') handles it.
+// On Windows there are no levels, so we re-apply alwaysOnTop to move it to the top of
+// the TOPMOST z-order stack.
+function raiseControlWindow() {
+  if (process.platform === 'darwin') return
+  if (!controlWindow || controlWindow.isDestroyed() || !controlWindow.isAlwaysOnTop()) return
+  controlWindow.setAlwaysOnTop(false)
+  controlWindow.setAlwaysOnTop(true)
+}
+
 // ── Control window ────────────────────────────────────────────
 
 function createControlWindow() {
@@ -196,8 +207,8 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
   browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden, alwaysOnTop, customCSS, cssKey: null, canGoBack: false, canGoForward: false })
 
   if (alwaysOnTop && !hidden) {
-    if (process.platform === 'darwin') win.setAlwaysOnTop(true, 'screen-saver')
-    else win.setAlwaysOnTop(true)
+    if (process.platform === 'darwin') win.setAlwaysOnTop(true, 'floating')
+    else { win.setAlwaysOnTop(true); raiseControlWindow() }
   }
 
   function updateNavState(newUrl) {
@@ -538,9 +549,10 @@ ipcMain.handle('window:alwaysOnTop', (_, { id, enabled }) => {
   }
   data.alwaysOnTop = enabled
   if (process.platform === 'darwin') {
-    data.win.setAlwaysOnTop(enabled, 'screen-saver')
+    data.win.setAlwaysOnTop(enabled, 'floating')
   } else {
     data.win.setAlwaysOnTop(enabled)
+    if (enabled) raiseControlWindow()
   }
   notifyControlWindow()
   saveState()
