@@ -122,6 +122,37 @@
       </div>
     </div>
 
+    <!-- Settings popover (teleported to body to escape card overflow:hidden) -->
+    <Teleport to="body">
+      <template v-if="openPopover">
+        <div class="wc-popover-backdrop" @click="openPopover = false"></div>
+        <div class="wc-popover" :style="popoverStyle">
+          <div class="wc-popover-row">
+            <div class="wc-popover-title">Auto-reload</div>
+            <button
+              class="wc-switch"
+              :class="{ 'wc-switch-on': settings.autoReload }"
+              @click="toggleAutoReload"
+              :title="settings.autoReload ? 'Disable auto-reload' : 'Enable auto-reload'"
+              role="switch"
+              :aria-checked="settings.autoReload"
+            ><span class="wc-switch-thumb"></span></button>
+          </div>
+          <label class="wc-popover-interval">
+            <span>Every</span>
+            <input
+              type="text"
+              v-model="localIntervalText"
+              class="wc-popover-duration"
+              placeholder="0:30"
+              @blur="onIntervalBlur"
+              @keydown.enter="$event.target.blur()"
+            />
+          </label>
+        </div>
+      </template>
+    </Teleport>
+
     <!-- Actions -->
     <div class="card-actions">
       <button
@@ -136,13 +167,18 @@
         </svg>
         {{ interactive ? 'Done' : 'Interact' }}
       </button>
-      <button @click="$emit('refresh')" class="action-btn" title="Refresh page">
+      <button
+        @click="$emit('refresh')"
+        class="action-btn"
+        :class="{ 'action-btn-autoreload': settings.autoReload }"
+        :title="settings.autoReload ? 'Auto-reload active — click to reload now' : 'Refresh page'"
+      >
         <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="23 4 23 10 17 10"></polyline>
           <polyline points="1 20 1 14 7 14"></polyline>
           <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
         </svg>
-        Refresh
+        {{ settings.autoReload ? formatDuration(countdown) : 'Refresh' }}
       </button>
       <button @click="$emit('move')" class="action-btn" title="Move to another screen">
         <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -182,6 +218,18 @@
         </svg>
         {{ win.blackout ? 'Unblack' : 'Blackout' }}
       </button>
+      <button
+        ref="cogBtnRef"
+        @click="togglePopover()"
+        class="action-btn action-btn-close"
+        :class="{ 'action-btn-cog-active': settings.autoReload }"
+        title="Advanced settings"
+      >
+        <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
       <button @click="$emit('close')" class="action-btn action-btn-close action-btn-danger" title="Close window">
         <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -193,7 +241,7 @@
 </template>
 
 <script>
-import { ref, nextTick, watch, onUnmounted } from 'vue'
+import { ref, computed, nextTick, watch, onUnmounted } from 'vue'
 
 export default {
   name: 'WindowCard',
@@ -201,9 +249,10 @@ export default {
     win: { type: Object, required: true },
     thumbnail: { type: String, default: null },
     display: { type: Object, default: null },
-    interactive: { type: Boolean, default: false }
+    interactive: { type: Boolean, default: false },
+    settings: { type: Object, default: () => ({ autoReload: false, reloadInterval: 30 }) }
   },
-  emits: ['refresh', 'move', 'close', 'navigate', 'back', 'forward', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key', 'toggle-interactive', 'pin'],
+  emits: ['refresh', 'move', 'close', 'navigate', 'back', 'forward', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key', 'toggle-interactive', 'pin', 'set-reload'],
   setup(props, { emit }) {
     const editing = ref(false)
     const editUrl = ref('')
@@ -261,7 +310,11 @@ export default {
       }
     })
 
-    onUnmounted(() => document.removeEventListener('keydown', onDocKeydown))
+    onUnmounted(() => {
+      document.removeEventListener('keydown', onDocKeydown)
+      document.removeEventListener('keydown', onPopoverKeydown)
+      if (countdownTimer) clearInterval(countdownTimer)
+    })
 
     async function onTypeKeydown(e) {
       if (e.key === 'Escape') {
@@ -307,7 +360,90 @@ export default {
       editing.value = false
     }
 
-    return { editing, editUrl, urlInputRef, startEdit, confirmEdit, cancelEdit, onThumbnailClick, onThumbnailScroll, typing, typeBuffer, typeInputRef, onTypeKeydown }
+    // ── Advanced: popovers ────────────────────────────────────────
+    const openPopover = ref(false)
+    const localInterval = ref(30)
+    const localIntervalText = ref('0:30')
+    const cogBtnRef = ref(null)
+    const popoverPos = ref({ bottom: 0, right: 0 })
+
+    const popoverStyle = computed(() => ({
+      position: 'fixed',
+      bottom: `${popoverPos.value.bottom}px`,
+      right: `${popoverPos.value.right}px`,
+      zIndex: 1000
+    }))
+
+    function formatDuration(secs) {
+      const m = Math.floor(secs / 60)
+      const s = secs % 60
+      return `${m}:${String(s).padStart(2, '0')}`
+    }
+
+    function parseDuration(str) {
+      const colonMatch = str.trim().match(/^(\d+):(\d{1,2})$/)
+      if (colonMatch) return parseInt(colonMatch[1]) * 60 + parseInt(colonMatch[2])
+      const n = parseInt(str)
+      return isNaN(n) ? null : n
+    }
+
+    function onIntervalBlur() {
+      const secs = Math.max(1, parseDuration(localIntervalText.value) ?? localInterval.value)
+      localInterval.value = secs
+      localIntervalText.value = formatDuration(secs)
+      onIntervalChange()
+    }
+
+    function togglePopover() {
+      if (openPopover.value) { openPopover.value = false; return }
+      if (cogBtnRef.value) {
+        const rect = cogBtnRef.value.getBoundingClientRect()
+        popoverPos.value = { bottom: window.innerHeight - rect.top + 6, right: window.innerWidth - rect.right }
+      }
+      localInterval.value = props.settings?.reloadInterval ?? 30
+      localIntervalText.value = formatDuration(localInterval.value)
+      openPopover.value = true
+    }
+
+    function onIntervalChange() {
+      localInterval.value = Math.max(1, localInterval.value || 1)
+      emit('set-reload', { enabled: props.settings?.autoReload ?? false, interval: localInterval.value })
+    }
+
+    function toggleAutoReload() {
+      emit('set-reload', { enabled: !props.settings?.autoReload, interval: Math.max(1, localInterval.value || 1) })
+    }
+
+    function onPopoverKeydown(e) {
+      if (e.key === 'Escape') { openPopover.value = false; e.preventDefault(); e.stopPropagation() }
+    }
+
+    watch(openPopover, (val) => {
+      if (val) document.addEventListener('keydown', onPopoverKeydown)
+      else document.removeEventListener('keydown', onPopoverKeydown)
+    })
+
+    const countdown = ref(0)
+    let countdownTimer = null
+
+    watch(
+      [() => props.settings.autoReload, () => props.settings.reloadStartedAt, () => props.settings.reloadInterval],
+      () => {
+        if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
+        if (!props.settings.autoReload || !props.settings.reloadStartedAt) { countdown.value = 0; return }
+        const tick = () => {
+          const elapsed = Math.floor((Date.now() - props.settings.reloadStartedAt) / 1000)
+          countdown.value = Math.max(0, (props.settings.reloadInterval ?? 30) - elapsed)
+        }
+        tick()
+        countdownTimer = setInterval(tick, 500)
+      },
+      { immediate: true }
+    )
+
+    return { editing, editUrl, urlInputRef, startEdit, confirmEdit, cancelEdit, onThumbnailClick, onThumbnailScroll, typing, typeBuffer, typeInputRef, onTypeKeydown,
+      openPopover, localInterval, localIntervalText, cogBtnRef, popoverStyle, countdown,
+      togglePopover, onIntervalBlur, toggleAutoReload, formatDuration }
   }
 }
 </script>
@@ -763,5 +899,122 @@ export default {
 .pin-active:hover {
   color: var(--accent);
   background: rgba(157, 119, 245, 0.32);
+}
+
+.action-btn-cog-active {
+  color: var(--accent);
+}
+
+.action-btn-cog-active:hover {
+  background: rgba(157, 119, 245, 0.1);
+  color: var(--accent);
+}
+
+.action-btn-autoreload {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.action-btn-autoreload:hover {
+  background: rgba(157, 119, 245, 0.1);
+  color: var(--accent);
+}
+</style>
+
+<style>
+/* Popover — global because it's teleported outside this component's scope */
+.wc-popover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+}
+
+.wc-popover {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 240px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.wc-popover-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.wc-popover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wc-popover-interval {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.wc-popover-duration {
+  width: 56px;
+  padding: 5px 8px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  outline: none;
+  text-align: center;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.wc-popover-duration:focus {
+  border-color: var(--accent);
+}
+
+.wc-switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+
+.wc-switch-on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.wc-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  transition: transform 0.2s, background 0.2s;
+}
+
+.wc-switch-on .wc-switch-thumb {
+  transform: translateX(16px);
+  background: #0d1117;
 }
 </style>

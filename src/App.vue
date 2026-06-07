@@ -86,6 +86,8 @@
           @interact-scroll="(normX, normY, deltaX, deltaY) => interactScroll(win.id, normX, normY, deltaX, deltaY)"
           @interact-key="(key, modifiers, cb) => interactKey(win.id, key, modifiers, cb)"
           @pin="handlePin(win.id)"
+          :settings="{ ...(windowSettings[win.id] || { autoReload: false, reloadInterval: 30 }), reloadStartedAt: reloadCycleStarts[win.id] }"
+          @set-reload="({ enabled, interval }) => handleSetReload(win.id, enabled, interval)"
         />
       </div>
     </main>
@@ -131,6 +133,9 @@ export default {
     let unsubscribe = null
     let unsubDisplays = null
     const interactThumbTimers = {}
+    const windowSettings = ref({})
+    const reloadTimers = {}
+    const reloadCycleStarts = ref({})
 
     // Grid layout
     const mainRef = ref(null)
@@ -271,10 +276,52 @@ export default {
       }
     }
 
+    function loadReloadSettings(displayId) {
+      try { return JSON.parse(localStorage.getItem(`reload:${displayId}`)) } catch { return null }
+    }
+
+    function saveReloadSettings(displayId, settings) {
+      localStorage.setItem(`reload:${displayId}`, JSON.stringify(settings))
+    }
+
+    function startReloadTimer(id, interval) {
+      clearReloadTimer(id)
+      reloadCycleStarts.value = { ...reloadCycleStarts.value, [id]: Date.now() }
+      reloadTimers[id] = setInterval(() => {
+        reloadCycleStarts.value = { ...reloadCycleStarts.value, [id]: Date.now() }
+        refreshWindow(id)
+      }, Math.max(1, interval) * 1000)
+    }
+
+    function clearReloadTimer(id) {
+      if (reloadTimers[id]) { clearInterval(reloadTimers[id]); delete reloadTimers[id] }
+      if (id in reloadCycleStarts.value) {
+        const next = { ...reloadCycleStarts.value }
+        delete next[id]
+        reloadCycleStarts.value = next
+      }
+    }
+
+    function initWindowSettings(win) {
+      if (windowSettings.value[win.id]) return
+      const saved = loadReloadSettings(win.displayId)
+      windowSettings.value = { ...windowSettings.value, [win.id]: saved || { autoReload: false, reloadInterval: 30 } }
+      if (saved?.autoReload) startReloadTimer(win.id, saved.reloadInterval)
+    }
+
     async function handlePin(id) {
       const win = windows.value.find(w => w.id === id)
       if (!win) return
       await window.api.setWindowAlwaysOnTop(id, !win.alwaysOnTop)
+    }
+
+    function handleSetReload(id, enabled, interval) {
+      interval = Math.max(1, interval || 1)
+      const win = windows.value.find(w => w.id === id)
+      if (win) saveReloadSettings(win.displayId, { autoReload: enabled, reloadInterval: interval })
+      windowSettings.value = { ...windowSettings.value, [id]: { autoReload: enabled, reloadInterval: interval } }
+      if (enabled) startReloadTimer(id, interval)
+      else clearReloadTimer(id)
     }
 
     function saveRecentUrl(url) {
@@ -291,11 +338,24 @@ export default {
 
       windows.value = await window.api.listWindows()
       fitWindowToCards(windows.value.length)
+      for (const win of windows.value) initWindowSettings(win)
 
       unsubscribe = window.api.onWindowsUpdated(updated => {
+        const prevIds = new Set(windows.value.map(w => w.id))
         const prevCount = windows.value.length
+        const nextSettings = { ...windowSettings.value }
+        for (const win of windows.value) {
+          if (!updated.find(w => w.id === win.id)) {
+            clearReloadTimer(win.id)
+            delete nextSettings[win.id]
+          }
+        }
+        windowSettings.value = nextSettings
         windows.value = updated
         if (updated.length !== prevCount) fitWindowToCards(updated.length)
+        for (const win of updated) {
+          if (!prevIds.has(win.id)) initWindowSettings(win)
+        }
       })
 
       unsubDisplays = window.api.onDisplaysUpdated(updated => {
@@ -332,6 +392,7 @@ export default {
     }
 
     async function closeWindow(id) {
+      clearReloadTimer(id)
       await window.api.closeWindow(id)
       const next = { ...thumbnails.value }
       delete next[id]
@@ -413,6 +474,7 @@ export default {
       if (unsubDisplays) unsubDisplays()
       if (thumbTimer) clearInterval(thumbTimer)
       if (resizeObserver) resizeObserver.disconnect()
+      Object.keys(reloadTimers).forEach(id => clearReloadTimer(Number(id)))
     })
 
     return {
@@ -420,9 +482,10 @@ export default {
       recentUrls, filteredRecentUrls, showSuggestions, suggestionIndex, appVersion,
       hideSuggestions, selectSuggestion, handleSuggestionsKey,
       mainRef, gridStyle,
+      windowSettings, reloadCycleStarts,
       displayById, openWindow, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
       setWindowVisibility, toggleAlwaysOnTop, startMove, doMove, toggleInteractive, interactClick, interactScroll, interactKey,
-      handlePin
+      handlePin, handleSetReload
     }
   }
 }
