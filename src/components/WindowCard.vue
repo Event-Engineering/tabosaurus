@@ -1,5 +1,5 @@
 <template>
-  <div class="card" :class="{ 'card-blacked-out': win.blackout, 'card-interactive': interactive }">
+  <div class="card" :class="{ 'card-blacked-out': win.blackout, 'card-interactive': interactive, 'card-hidden': win.hidden, 'card-pinned': win.alwaysOnTop && !win.blackout && !interactive }">
     <!-- Thumbnail -->
     <div
       class="thumbnail-wrap"
@@ -58,6 +58,18 @@
       <div v-if="interactive" class="interactive-badge">
         <span class="interactive-dot"></span>Live
       </div>
+
+      <!-- Hidden overlay on thumbnail -->
+      <Transition name="hidden-overlay">
+        <div v-if="win.hidden" class="hidden-overlay">
+          <svg class="hidden-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path>
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+            <line x1="1" y1="1" x2="23" y2="23"></line>
+          </svg>
+          <span>Hidden</span>
+        </div>
+      </Transition>
 
       <!-- Blackout overlay on thumbnail -->
       <Transition name="blackout" :duration="550">
@@ -501,15 +513,40 @@ export default {
   box-shadow: 0 0 0 1px rgba(157, 119, 245, 0.15);
 }
 
+/* Pinned: strong accent glow */
+.card-pinned {
+  border-color: rgba(157, 119, 245, 0.7);
+  box-shadow: 0 0 0 1px rgba(157, 119, 245, 0.35), 0 0 18px rgba(157, 119, 245, 0.22);
+}
+
+.card-pinned:hover {
+  border-color: rgba(157, 119, 245, 0.95);
+  box-shadow: 0 0 0 2px rgba(157, 119, 245, 0.55), 0 0 24px rgba(157, 119, 245, 0.32);
+}
+
+/* Hidden: grey border, thumbnail has the overlay */
+.card-hidden {
+  border-color: rgba(140, 140, 160, 0.45);
+  box-shadow: 0 0 0 1px rgba(140, 140, 160, 0.15), 0 0 12px rgba(140, 140, 160, 0.08);
+}
+
+.card-hidden:hover {
+  border-color: rgba(140, 140, 160, 0.7);
+  box-shadow: 0 0 0 1px rgba(140, 140, 160, 0.3), 0 0 16px rgba(140, 140, 160, 0.14);
+}
+
+/* Blacked out: red border + outer glow */
 .card-blacked-out {
-  border-color: rgba(248, 81, 73, 0.4);
+  border-color: rgba(248, 81, 73, 0.5);
+  box-shadow: 0 0 0 1px rgba(248, 81, 73, 0.2), 0 0 12px rgba(248, 81, 73, 0.15);
 }
 
 .card-blacked-out:hover {
-  border-color: rgba(248, 81, 73, 0.7);
-  box-shadow: 0 0 0 1px rgba(248, 81, 73, 0.15);
+  border-color: rgba(248, 81, 73, 0.8);
+  box-shadow: 0 0 0 1px rgba(248, 81, 73, 0.35), 0 0 16px rgba(248, 81, 73, 0.22);
 }
 
+/* Interactive: green glow (highest priority) */
 .card-interactive {
   border-color: #3fb950;
   box-shadow: 0 0 0 2px rgba(63, 185, 80, 0.4), 0 0 16px rgba(63, 185, 80, 0.25);
@@ -605,6 +642,41 @@ export default {
 @keyframes live-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.2; }
+}
+
+/* Hidden overlay */
+.hidden-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6em;
+  background: rgba(20, 22, 30, 0.72);
+  backdrop-filter: grayscale(100%) blur(1px);
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 2.5cqw;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.hidden-icon {
+  width: 5cqw;
+  height: 5cqw;
+  min-width: 18px;
+  min-height: 18px;
+}
+
+.hidden-overlay-enter-active,
+.hidden-overlay-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.hidden-overlay-enter-from,
+.hidden-overlay-leave-to {
+  opacity: 0;
 }
 
 .thumbnail-wrap {
