@@ -347,6 +347,7 @@ export default {
 
       unsubscribe = window.api.onWindowsUpdated(updated => {
         const prevIds = new Set(windows.value.map(w => w.id))
+        const prevDisplayById = new Map(windows.value.map(w => [w.id, w.displayId]))
         const prevCount = windows.value.length
         const nextSettings = { ...windowSettings.value }
         for (const win of windows.value) {
@@ -357,7 +358,8 @@ export default {
         }
         windowSettings.value = nextSettings
         windows.value = updated
-        if (updated.length !== prevCount) fitWindowToCards(updated.length)
+        const displayChanged = updated.some(w => prevDisplayById.get(w.id) !== w.displayId)
+        if (updated.length !== prevCount || displayChanged) fitWindowToCards(updated.length)
         for (const win of updated) {
           if (!prevIds.has(win.id)) initWindowSettings(win)
         }

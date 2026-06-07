@@ -575,16 +575,17 @@ export default {
 
 .interactive-badge {
   position: absolute;
-  top: 2cqw;
-  right: 2cqw;
+  top: clamp(4px, 1.5cqw, 10px);
+  left: clamp(4px, 1.5cqw, 10px);
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 1cqw;
-  padding: 0.8cqw 1.5cqw;
+  height: clamp(20px, 5.5cqw, 32px);
+  gap: min(1cqw, 6px);
+  padding: 0 min(1.5cqw, 10px);
   background: rgba(0, 0, 0, 0.65);
   color: #3fb950;
-  font-size: 2cqw;
+  font-size: clamp(9px, 2cqw, 13px);
   font-weight: 600;
   letter-spacing: 0.04em;
   border-radius: 4px;
@@ -593,10 +594,8 @@ export default {
 }
 
 .interactive-dot {
-  width: 1.5cqw;
-  height: 1.5cqw;
-  min-width: 5px;
-  min-height: 5px;
+  width: clamp(5px, 1.5cqw, 8px);
+  height: clamp(5px, 1.5cqw, 8px);
   border-radius: 50%;
   background: #3fb950;
   flex-shrink: 0;
@@ -728,7 +727,7 @@ export default {
 
 /* Card body */
 .card-body {
-  padding: 1.5cqw 2.5cqw;
+  padding: min(1.5cqw, 10px) min(2.5cqw, 16px);
   flex: 1;
   min-width: 0;
 }
@@ -736,7 +735,7 @@ export default {
 .url-row {
   display: flex;
   align-items: center;
-  gap: 1.25cqw;
+  gap: min(1.25cqw, 8px);
 }
 
 .url {
@@ -759,10 +758,8 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 4.2cqw;
-  height: 4.2cqw;
-  min-width: 17px;
-  min-height: 17px;
+  width: clamp(17px, 4.2cqw, 24px);
+  height: clamp(17px, 4.2cqw, 24px);
   font-size: clamp(10px, 2.3cqw, 13px);
   border-radius: 4px;
   background: transparent;
@@ -803,7 +800,7 @@ export default {
 
 .url-edit-input {
   flex: 1;
-  padding: 0.85cqw 1.25cqw;
+  padding: min(0.85cqw, 7px) min(1.25cqw, 10px);
   background: var(--bg-dark);
   border: 1px solid var(--accent);
   border-radius: 4px;
@@ -817,16 +814,14 @@ export default {
 .display-tag {
   display: flex;
   align-items: center;
-  gap: 1cqw;
+  gap: min(1cqw, 6px);
   font-size: clamp(9px, 2.1cqw, 12px);
   color: var(--text-secondary);
 }
 
 .dot {
-  width: 1.25cqw;
-  height: 1.25cqw;
-  min-width: 4px;
-  min-height: 4px;
+  width: clamp(4px, 1.25cqw, 7px);
+  height: clamp(4px, 1.25cqw, 7px);
   border-radius: 50%;
   background: var(--text-secondary);
   flex-shrink: 0;
@@ -847,8 +842,8 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.85cqw;
-  padding: 1.5cqw 0.85cqw;
+  gap: min(0.85cqw, 6px);
+  padding: min(1.5cqw, 10px) min(0.85cqw, 7px);
   background: transparent;
   color: var(--text-secondary);
   font-size: clamp(10px, 2.5cqw, 14px);
@@ -897,44 +892,44 @@ export default {
 
 .action-btn-close {
   flex: none;
-  padding: 1.5cqw;
+  padding: min(1.5cqw, 10px);
 }
 
 /* Pin badge */
 .pin-badge {
   position: absolute;
-  top: 1.5cqw;
-  right: 1.5cqw;
+  top: clamp(4px, 1.5cqw, 10px);
+  right: clamp(4px, 1.5cqw, 10px);
   z-index: 10;
-  width: 5.5cqw;
-  height: 5.5cqw;
-  min-width: 20px;
-  min-height: 20px;
+  width: clamp(20px, 5.5cqw, 32px);
+  height: clamp(20px, 5.5cqw, 32px);
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
-  color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 3cqw;
+  font-size: clamp(10px, 3cqw, 18px);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 
 .pin-badge:hover {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.9);
   background: rgba(0, 0, 0, 0.7);
 }
 
 .pin-active {
   color: var(--accent);
-  background: rgba(157, 119, 245, 0.2);
+  background: rgba(0, 0, 0, 0.65);
+  box-shadow: 0 0 0 1px rgba(157, 119, 245, 0.6);
 }
 
 .pin-active:hover {
   color: var(--accent);
-  background: rgba(157, 119, 245, 0.32);
+  background: rgba(0, 0, 0, 0.8);
+  box-shadow: 0 0 0 1px rgba(157, 119, 245, 0.9);
 }
 
 .action-btn-cog-active {
