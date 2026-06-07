@@ -180,7 +180,7 @@
         @click="$emit('toggle-interactive')"
         class="action-btn action-btn-interact"
         :class="{ 'action-btn-active': interactive }"
-        :disabled="win.hidden"
+        :disabled="win.hidden || win.blackout"
         :title="interactive ? 'Exit interactive mode' : 'Interact via thumbnail'"
       >
         <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">

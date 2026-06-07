@@ -446,10 +446,12 @@ export default {
     }
 
     async function blackoutWindow(id, blackout) {
+      if (blackout && interactiveWindowId.value === id) interactiveWindowId.value = null
       await window.api.blackoutWindow(id, blackout)
     }
 
     async function setWindowVisibility(id, hidden) {
+      if (hidden && interactiveWindowId.value === id) interactiveWindowId.value = null
       await window.api.setWindowVisibility(id, hidden)
     }
 
