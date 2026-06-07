@@ -176,24 +176,23 @@ export default {
       return result
     }
 
+    function computeCols(n, W, H) {
+      const C = effectiveC()
+      const GAP = 20, MIN_CARD_W = 340
+      let cols = Math.max(1, Math.min(n, Math.round(Math.sqrt(n * W / H / (1 / C)))))
+      while (cols > 1 && (W - GAP * (cols - 1)) / cols < MIN_CARD_W) cols--
+      return cols
+    }
+
     const gridStyle = computed(() => {
       const n = windows.value.length
       if (n === 0 || !containerW.value) return {}
 
       const W = containerW.value  // contentRect already excludes .main padding
       const H = containerH.value
-      const GAP = 20
+      const GAP = 20, K = 15
 
-      const C = effectiveC(), K = 15
-
-      // Minimum card width: action row has 5 labelled buttons + 1 icon-only close.
-      // At 10px font floor the row needs ~330px; 340 gives comfortable breathing room.
-      const MIN_CARD_W = 340
-
-      // Column count that best matches the container's aspect ratio.
-      // Card aspect ratio = 1/C ≈ 1.51
-      let cols = Math.max(1, Math.min(n, Math.round(Math.sqrt(n * W / H / (1 / C)))))
-      while (cols > 1 && (W - GAP * (cols - 1)) / cols < MIN_CARD_W) cols--
+      const cols = computeCols(n, W, H)
 
       const rows = Math.ceil(n / cols)
 
@@ -213,14 +212,15 @@ export default {
       return displays.value.find(d => d.id === id) || null
     }
 
-    function fitWindowToCards(n) {
+    function fitWindowToCards(n, savedCardW = null) {
       const count = Math.max(n, 1)
       const GAP = 20, K = 15, MAIN_PAD = 40
-      const C = effectiveC()
 
-      // Target ~27% of the primary display width per card
       const primary = displays.value.find(d => d.isPrimary) || displays.value[0]
-      const CARD_W = primary ? Math.round(primary.bounds.width * 0.27) : 480
+      const defaultCardW = primary ? Math.round(primary.bounds.width * 0.27) : 480
+
+      // Use the card width captured before windows.value was updated; fall back to default.
+      const CARD_W = (savedCardW !== null && savedCardW >= 200) ? savedCardW : defaultCardW
 
       const headerEl = document.querySelector('.header')
       const HEADER_H = headerEl ? headerEl.offsetHeight : 64
@@ -349,6 +349,20 @@ export default {
         const prevIds = new Set(windows.value.map(w => w.id))
         const prevDisplayById = new Map(windows.value.map(w => [w.id, w.displayId]))
         const prevCount = windows.value.length
+
+        // Capture current card width BEFORE updating windows.value so effectiveC / rowMaxCs
+        // still reflect the previous layout when we compute it.
+        let savedCardW = null
+        if (prevCount > 0 && containerW.value > 0 && containerH.value > 0) {
+          const GAP = 20, K = 15
+          const cols = computeCols(prevCount, containerW.value, containerH.value)
+          const rows = Math.ceil(prevCount / cols)
+          const sumC = rowMaxCs(cols).reduce((a, b) => a + b, 0)
+          const maxCW = (containerH.value - K * rows - GAP * (rows - 1)) / sumC
+          const cw = Math.min((containerW.value - GAP * (cols - 1)) / cols, maxCW)
+          if (cw >= 200) savedCardW = Math.round(cw)
+        }
+
         const nextSettings = { ...windowSettings.value }
         for (const win of windows.value) {
           if (!updated.find(w => w.id === win.id)) {
@@ -359,7 +373,7 @@ export default {
         windowSettings.value = nextSettings
         windows.value = updated
         const displayChanged = updated.some(w => prevDisplayById.get(w.id) !== w.displayId)
-        if (updated.length !== prevCount || displayChanged) fitWindowToCards(updated.length)
+        if (updated.length !== prevCount || displayChanged) fitWindowToCards(updated.length, savedCardW)
         for (const win of updated) {
           if (!prevIds.has(win.id)) initWindowSettings(win)
         }
