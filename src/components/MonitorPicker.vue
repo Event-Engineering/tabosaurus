@@ -1,8 +1,8 @@
 <template>
   <div class="overlay" @click.self="$emit('cancel')">
-    <div class="picker">
+    <div class="picker" :style="pickerStyle">
       <div class="picker-header">
-        <h3>Move to Screen</h3>
+        <h3>{{ title }}</h3>
         <button @click="$emit('cancel')" class="close-btn" title="Cancel">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -23,7 +23,7 @@
         </div>
 
         <template v-else>
-          <p class="instruction">Click a screen to move the window there.</p>
+          <p class="instruction">{{ instruction }}</p>
           <div class="layout-wrap">
             <div
               class="layout"
@@ -34,39 +34,25 @@
                 :key="d.id"
                 class="monitor"
                 :class="{
-                  'is-current': d.id === win.displayId,
-                  'is-target': d.id !== win.displayId
+                  'is-current': d.id === win.displayId && !allowCurrent,
+                  'is-selected': d.id === win.displayId && allowCurrent,
+                  'is-target': d.id !== win.displayId || allowCurrent
                 }"
                 :style="{ left: d.x + 'px', top: d.y + 'px', width: d.width + 'px', height: d.height + 'px' }"
-                @click="d.id !== win.displayId && select(d.id)"
+                @click="(allowCurrent || d.id !== win.displayId) && select(d.id)"
               >
+                <span v-if="d.isPrimary" class="badge-primary">Primary</span>
                 <span class="monitor-name">{{ d.label }}</span>
-                <span v-if="d.isPrimary" class="badge badge-primary">Primary</span>
-                <div v-if="d.id === win.displayId" class="window-indicator">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" opacity="0.6">
-                    <rect x="2" y="3" width="20" height="14" rx="2"></rect>
-                  </svg>
+                <div v-if="d.id === win.displayId && !allowCurrent" class="monitor-indicator">
                   <span>Here</span>
                 </div>
-                <div v-else class="move-hint">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="5 9 2 12 5 15"></polyline>
-                    <polyline points="9 5 12 2 15 5"></polyline>
-                    <polyline points="15 19 12 22 9 19"></polyline>
-                    <polyline points="19 9 22 12 19 15"></polyline>
-                    <line x1="2" y1="12" x2="22" y2="12"></line>
-                    <line x1="12" y1="2" x2="12" y2="22"></line>
-                  </svg>
-                  Move here
+                <div v-else class="monitor-indicator action-hint">
+                  {{ allowCurrent ? 'Open here' : 'Move here' }}
                 </div>
               </div>
             </div>
           </div>
         </template>
-      </div>
-
-      <div class="picker-footer">
-        <button @click="$emit('cancel')" class="btn btn-cancel">Cancel</button>
       </div>
     </div>
   </div>
@@ -75,14 +61,18 @@
 <script>
 import { computed } from 'vue'
 
-const LAYOUT_MAX_W = 520
-const LAYOUT_MAX_H = 280
+const LAYOUT_MAX_W = 380
+const LAYOUT_MAX_H = 200
 
 export default {
   name: 'MonitorPicker',
   props: {
     win: { type: Object, required: true },
-    displays: { type: Array, required: true }
+    displays: { type: Array, required: true },
+    title: { type: String, default: 'Move to Screen' },
+    instruction: { type: String, default: 'Click a screen to move the window there.' },
+    allowCurrent: { type: Boolean, default: false },
+    anchor: { type: Object, default: null }
   },
   emits: ['move', 'cancel'],
   setup(props, { emit }) {
@@ -122,11 +112,32 @@ export default {
       }
     })
 
+    const pickerStyle = computed(() => {
+      if (!props.anchor) return {}
+      const GAP = 8
+      const W = 560
+      const a = props.anchor
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+
+      const nearTop = a.top < vh / 3
+
+      const vertical = nearTop
+        ? { top: (a.bottom + GAP) + 'px', bottom: 'auto' }
+        : { top: 'auto', bottom: (vh - a.top + GAP) + 'px' }
+
+      const left = nearTop
+        ? Math.max(8, a.right - W)
+        : Math.min(Math.max(8, (a.left + a.right) / 2 - W / 2), vw - W - 8)
+
+      return { position: 'absolute', ...vertical, left: left + 'px', transform: 'none' }
+    })
+
     function select(displayId) {
       emit('move', { windowId: props.win.id, displayId })
     }
 
-    return { layout, select }
+    return { layout, pickerStyle, select }
   }
 }
 </script>
@@ -135,41 +146,41 @@ export default {
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.72);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
   z-index: 100;
-  backdrop-filter: blur(3px);
 }
 
 .picker {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  width: 620px;
+  width: 560px;
   max-width: 92vw;
   overflow: hidden;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .picker-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border);
 }
 
 .picker-header h3 {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .close-btn {
   background: transparent;
   color: var(--text-secondary);
-  padding: 5px;
+  padding: 4px;
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -183,13 +194,13 @@ export default {
 }
 
 .picker-body {
-  padding: 24px;
+  padding: 16px 20px;
 }
 
 .instruction {
   font-size: 12px;
   color: var(--text-secondary);
-  margin-bottom: 20px;
+  margin-bottom: 14px;
   text-align: center;
 }
 
@@ -201,16 +212,15 @@ export default {
 
 .layout {
   position: relative;
+  flex-shrink: 0;
 }
 
 .monitor {
   position: absolute;
   border-radius: 5px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
   overflow: hidden;
   transition: background 0.15s, border-color 0.15s;
   border: 2px solid transparent;
@@ -233,48 +243,63 @@ export default {
   border-color: rgba(157, 119, 245, 0.5);
 }
 
-.is-target:hover .move-hint {
-  opacity: 1;
+.is-selected {
+  background: rgba(157, 119, 245, 0.12);
+  border-color: var(--accent);
 }
 
-.monitor-name {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.badge {
-  font-size: 9px;
-  padding: 1px 6px;
-  border-radius: 10px;
-  font-weight: 500;
+.is-selected:hover {
+  background: rgba(157, 119, 245, 0.18);
+  border-color: var(--accent);
 }
 
 .badge-primary {
-  background: rgba(157, 119, 245, 0.15);
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  font-weight: 600;
   color: var(--accent);
+  background: rgba(157, 119, 245, 0.18);
+  padding: 1px 5px;
+  border-radius: 10px;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
-.window-indicator {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  color: var(--accent);
+.monitor-name {
   font-size: 10px;
-  margin-top: 2px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: calc(100% - 8px);
+  text-align: center;
 }
 
-.move-hint {
+.monitor-indicator {
+  position: absolute;
+  bottom: 5px;
+  left: 0;
+  right: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  font-size: 10px;
+  justify-content: center;
+  font-size: 9px;
   color: var(--text-secondary);
+  pointer-events: none;
+}
+
+
+.monitor-indicator.action-hint {
   opacity: 0;
   transition: opacity 0.15s;
-  margin-top: 2px;
+}
+
+.is-target:hover .monitor-indicator.action-hint {
+  opacity: 1;
 }
 
 .single-display-msg {
@@ -291,31 +316,5 @@ export default {
   font-size: 11px;
   max-width: 300px;
   line-height: 1.5;
-}
-
-.picker-footer {
-  padding: 12px 20px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  justify-content: flex-end;
-}
-
-.btn {
-  padding: 7px 16px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.btn-cancel {
-  background: var(--bg-dark);
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
-  transition: background 0.12s, color 0.12s;
-}
-
-.btn-cancel:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
 }
 </style>

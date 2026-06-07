@@ -213,7 +213,7 @@
         </svg>
         {{ settings.autoReload ? formatDuration(countdown) : 'Refresh' }}
       </button>
-      <button @click="$emit('move')" class="action-btn" title="Move to another screen">
+      <button @click="$emit('move', $event.currentTarget.getBoundingClientRect())" class="action-btn" title="Move to another screen">
         <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
           <line x1="8" y1="21" x2="16" y2="21"></line>

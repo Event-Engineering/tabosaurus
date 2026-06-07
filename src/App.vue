@@ -31,16 +31,19 @@
             </li>
           </ul>
         </div>
-        <select
+        <button
           v-if="displays.length > 1"
-          v-model="selectedDisplayId"
-          class="display-select"
+          class="btn btn-display"
+          @click="openDisplayPicker"
           title="Choose display"
         >
-          <option v-for="d in displays" :key="d.id" :value="d.id">
-            {{ d.label }}{{ d.isPrimary ? ' (Primary)' : '' }}
-          </option>
-        </select>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+          {{ selectedDisplay ? selectedDisplay.label : '' }}
+        </button>
         <button @click="openWindow" class="btn btn-primary" :disabled="!urlInput.trim()">
           Open
         </button>
@@ -82,7 +85,7 @@
           :interactive="win.id === interactiveWindowId"
           @refresh="refreshWindow(win.id)"
           @close="closeWindow(win.id)"
-          @move="startMove(win)"
+          @move="(e) => startMove(win, e)"
           @navigate="(url) => navigateWindow(win.id, url)"
           @back="goBack(win.id)"
           @forward="goForward(win.id)"
@@ -104,8 +107,20 @@
       v-if="movingWindow"
       :win="movingWindow"
       :displays="displays"
+      :anchor="moveAnchor"
       @move="doMove"
       @cancel="movingWindow = null"
+    />
+    <MonitorPicker
+      v-if="showDisplayPicker"
+      :win="{ id: null, displayId: selectedDisplayId }"
+      :displays="displays"
+      :anchor="displayPickerAnchor"
+      title="Open on Screen"
+      instruction="Click a screen to open new windows there."
+      :allowCurrent="true"
+      @move="selectDisplay"
+      @cancel="showDisplayPicker = false"
     />
   </div>
 </template>
@@ -125,6 +140,9 @@ export default {
     const windows = ref([])
     const thumbnails = ref({})
     const movingWindow = ref(null)
+    const moveAnchor = ref(null)
+    const showDisplayPicker = ref(false)
+    const displayPickerAnchor = ref(null)
     const alwaysOnTop = ref(true)
     const interactiveWindowId = ref(null)
     const recentUrls = ref(JSON.parse(localStorage.getItem('recentUrls') || '[]'))
@@ -238,6 +256,13 @@ export default {
 
     function displayById(id) {
       return displays.value.find(d => d.id === id) || null
+    }
+
+    const selectedDisplay = computed(() => displays.value.find(d => d.id === selectedDisplayId.value) || null)
+
+    function selectDisplay({ displayId }) {
+      selectedDisplayId.value = displayId
+      showDisplayPicker.value = false
     }
 
     function headerFixedW() {
@@ -536,8 +561,22 @@ export default {
       await window.api.setAlwaysOnTop(alwaysOnTop.value)
     }
 
-    function startMove(win) {
+    function startMove(win, anchor) {
       movingWindow.value = win
+      moveAnchor.value = anchor ?? null
+    }
+
+    function openDisplayPicker(event) {
+      const btnRect = event.currentTarget.getBoundingClientRect()
+      const pinBtn = event.currentTarget.closest('.url-bar')?.querySelector('.btn-pin')
+      const pinRect = pinBtn?.getBoundingClientRect()
+      displayPickerAnchor.value = {
+        top: btnRect.top,
+        bottom: btnRect.bottom,
+        left: btnRect.left,
+        right: pinRect ? pinRect.right : btnRect.right
+      }
+      showDisplayPicker.value = true
     }
 
     async function doMove({ windowId, displayId }) {
@@ -564,13 +603,13 @@ export default {
     })
 
     return {
-      urlInput, displays, selectedDisplayId, windows, thumbnails, movingWindow, alwaysOnTop, interactiveWindowId,
+      urlInput, displays, selectedDisplayId, selectedDisplay, windows, thumbnails, movingWindow, moveAnchor, showDisplayPicker, displayPickerAnchor, alwaysOnTop, interactiveWindowId,
       recentUrls, filteredRecentUrls, showSuggestions, suggestionIndex, appVersion,
       hideSuggestions, selectSuggestion, handleSuggestionsKey, removeRecentUrl,
       mainRef, gridStyle,
       windowSettings, reloadCycleStarts,
       displayById, openWindow, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
-      setWindowVisibility, toggleAlwaysOnTop, startMove, doMove, toggleInteractive, interactClick, interactScroll, interactKey,
+      setWindowVisibility, toggleAlwaysOnTop, startMove, openDisplayPicker, doMove, selectDisplay, toggleInteractive, interactClick, interactScroll, interactKey,
       handlePin, handleSetReload, handleApplyCss
     }
   }
@@ -671,12 +710,14 @@ export default {
 
 .url-input {
   width: 100%;
-  padding: 8px 12px;
+  height: 35px;
+  box-sizing: border-box;
+  padding: 0 12px;
   background: var(--bg-dark);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 13px;
   outline: none;
   transition: border-color 0.15s;
 }
@@ -689,30 +730,19 @@ export default {
   color: var(--text-secondary);
 }
 
-.display-select {
-  padding: 8px 10px;
-  background: var(--bg-dark);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-primary);
-  font-size: 13px;
-  outline: none;
-  cursor: pointer;
-  white-space: nowrap;
-  max-width: 180px;
-}
-
-.display-select:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
 
 .btn {
-  padding: 8px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 35px;
+  box-sizing: border-box;
+  padding: 0 18px;
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
-  transition: opacity 0.15s;
+  border: 1px solid transparent;
+  transition: opacity 0.15s, background 0.12s, color 0.12s, border-color 0.12s;
   white-space: nowrap;
 }
 
@@ -723,6 +753,7 @@ export default {
 
 .btn-primary {
   background: var(--accent);
+  border-color: rgba(0, 0, 0, 0.2);
   color: #0d1117;
 }
 
@@ -730,16 +761,25 @@ export default {
   opacity: 0.82;
 }
 
-.btn-pin {
-  padding: 8px 10px;
+.btn-display {
+  gap: 5px;
+  padding: 0 11px;
   background: var(--bg-dark);
-  border: 1px solid var(--border);
+  border-color: var(--border);
   color: var(--text-secondary);
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  flex-shrink: 0;
+}
+
+.btn-display:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.btn-pin {
+  padding: 0 10px;
+  background: var(--bg-dark);
+  border-color: var(--border);
+  color: var(--text-secondary);
   flex-shrink: 0;
 }
 
