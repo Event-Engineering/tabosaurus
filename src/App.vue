@@ -237,31 +237,31 @@ export default {
       return cols
     }
 
-    const gridStyle = computed(() => {
+    // Two height models for maxCardW:
+    // 1. Proportional (accurate at small card widths): controls scale with cqw, C includes C_BODY
+    // 2. Capped (accurate at large card widths): controls hit clamp() caps ~85px, C is just display aspect
+    // Take the less restrictive (larger maxCardW) — the controls will actually fit.
+    const cardLayout = computed(() => {
       const n = windows.value.length
-      if (n === 0 || !containerW.value || !containerH.value) return {}
-
-      const W = containerW.value
-      const H = containerH.value
-      const GAP = 20, K = 15
-
+      if (n === 0 || !containerW.value || !containerH.value) return null
+      const W = containerW.value, H = containerH.value, GAP = 20, K = 15
       const cols = computeCols(n, W, H)
       const rows = Math.ceil(n / cols)
-
-      // Two height models for maxCardW:
-      // 1. Proportional (accurate at small card widths): controls scale with cqw, C includes C_BODY
-      // 2. Capped (accurate at large card widths): controls hit clamp() caps ~85px, C is just display aspect
-      // Take the less restrictive (larger maxCardW) — the controls will actually fit.
       const sumC = rowMaxCs(cols).reduce((a, b) => a + b, 0)
       const sumAspect = rowMaxAspects(cols).reduce((a, b) => a + b, 0)
       const maxCardW = Math.max(
         (H - K * rows - GAP * (rows - 1)) / sumC,
         (H - 85 * rows - GAP * (rows - 1)) / sumAspect
       )
+      return { cols, cardW: Math.min((W - GAP * (cols - 1)) / cols, maxCardW) }
+    })
 
-      const cardW = Math.min((W - GAP * (cols - 1)) / cols, maxCardW)
+    const gridStyle = computed(() => {
+      const layout = cardLayout.value
+      if (!layout) return {}
+      const { cols, cardW } = layout
+      const GAP = 20
       const maxW = Math.round(cols * cardW + GAP * (cols - 1))
-
       return { gridTemplateColumns: `repeat(${cols}, 1fr)`, maxWidth: `${maxW}px` }
     })
 
@@ -515,10 +515,16 @@ export default {
       navigator.mediaDevices.addEventListener('devicechange', refreshAudioOutputDevices)
     }
 
+    function thumbTargetWidth() {
+      const cardW = cardLayout.value?.cardW || 410
+      return Math.round(cardW * window.devicePixelRatio)
+    }
+
     async function refreshThumbnails() {
+      const targetW = thumbTargetWidth()
       for (const win of windows.value) {
         if (win.hidden) continue
-        const thumb = await window.api.getThumbnail(win.id)
+        const thumb = await window.api.getThumbnail(win.id, targetW)
         if (thumb) thumbnails.value = { ...thumbnails.value, [win.id]: thumb }
       }
     }
@@ -570,7 +576,7 @@ export default {
     async function goForward(id) { await window.api.goForward(id) }
 
     async function refreshThumbnail(id) {
-      const thumb = await window.api.getThumbnail(id)
+      const thumb = await window.api.getThumbnail(id, thumbTargetWidth())
       if (thumb) thumbnails.value = { ...thumbnails.value, [id]: thumb }
     }
 

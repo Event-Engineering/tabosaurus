@@ -437,12 +437,12 @@ ipcMain.handle('window:move', async (_, { id, displayId }) => {
   saveState()
 })
 
-ipcMain.handle('window:thumbnail', async (_, { id }) => {
+ipcMain.handle('window:thumbnail', async (_, { id, targetWidth }) => {
   const data = browserWindows.get(id)
   if (!data || data.win.isDestroyed()) return null
   try {
     const img = await data.win.webContents.capturePage()
-    return img.resize({ width: 480 }).toDataURL()
+    return img.resize({ width: targetWidth, quality: 'best' }).toDataURL()
   } catch {
     return null
   }
