@@ -19,11 +19,18 @@ function raiseControlWindow() {
 
 // ── Control window ────────────────────────────────────────────
 
+let saveStateTimer = null
+function debouncedSaveState() {
+  clearTimeout(saveStateTimer)
+  saveStateTimer = setTimeout(saveState, 500)
+}
+
 function createControlWindow() {
   const iconExt = process.platform === 'darwin' ? 'icns' : process.platform === 'win32' ? 'ico' : 'png'
+  const savedBounds = loadState()?.controlBounds
   controlWindow = new BrowserWindow({
-    width: 960,
-    height: 700,
+    width: savedBounds?.width || 960,
+    height: savedBounds?.height || 700,
     minWidth: 500,
     minHeight: 400,
     icon: path.join(__dirname, `../build/icon.${iconExt}`),
@@ -52,6 +59,8 @@ function createControlWindow() {
   if (isDev) {
     controlWindow.webContents.openDevTools({ mode: 'detach' })
   }
+
+  controlWindow.on('resize', debouncedSaveState)
 
   controlWindow.on('closed', () => {
     controlWindow = null
@@ -177,6 +186,7 @@ function removeBlackout(win) {
 
 function saveState() {
   const state = {
+    controlBounds: controlWindow && !controlWindow.isDestroyed() ? controlWindow.getBounds() : undefined,
     windows: Array.from(browserWindows.values()).map(d => ({
       url: d.url,
       displayId: d.displayId,

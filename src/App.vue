@@ -48,6 +48,19 @@
           Open
         </button>
         <button
+          v-if="windows.length > 0"
+          @click="resetLayout"
+          class="btn btn-pin"
+          title="Fit window to cards"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 14 4 20 10 20"></polyline>
+            <polyline points="20 10 20 4 14 4"></polyline>
+            <line x1="14" y1="10" x2="20" y2="4"></line>
+            <line x1="4" y1="20" x2="10" y2="14"></line>
+          </svg>
+        </button>
+        <button
           @click="toggleAlwaysOnTop"
           class="btn btn-pin"
           :class="{ 'btn-pin-active': alwaysOnTop }"
@@ -350,6 +363,10 @@ export default {
       window.api.setContentSize(Math.round(w), Math.round(h))
     }
 
+    function resetLayout() {
+      fitWindowToCards(windows.value.length)
+    }
+
     function hideSuggestions() {
       showSuggestions.value = false
       suggestionIndex.value = -1
@@ -464,7 +481,6 @@ export default {
       if (defaultDisplay) selectedDisplayId.value = defaultDisplay.id
 
       windows.value = await window.api.listWindows()
-      fitWindowToCards(windows.value.length)
       for (const win of windows.value) initWindowSettings(win)
 
       unsubscribe = window.api.onWindowsUpdated(updated => {
@@ -665,7 +681,7 @@ export default {
       hideSuggestions, selectSuggestion, handleSuggestionsKey, removeRecentUrl,
       mainRef, gridStyle,
       windowSettings, reloadCycleStarts,
-      displayById, openWindow, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
+      displayById, openWindow, resetLayout, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
       setWindowVisibility, toggleAlwaysOnTop, startMove, openDisplayPicker, doMove, selectDisplay, toggleInteractive, interactClick, interactScroll, interactKey,
       handlePin, handleSetReload, handleApplyCss, handleRenameDisplay, handleSetZoom, handleSetMuted, handleSetAudioOutput,
       audioOutputDevices
