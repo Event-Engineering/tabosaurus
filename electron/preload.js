@@ -25,6 +25,15 @@ contextBridge.exposeInMainWorld('api', {
   injectCSS: (id, css) => ipcRenderer.invoke('window:injectCSS', { id, css }),
   setZoom: (id, factor) => ipcRenderer.invoke('window:setZoom', { id, factor }),
   setMuted: (id, muted) => ipcRenderer.invoke('window:setMuted', { id, muted }),
+  setAudioOutput: (id, deviceId) => ipcRenderer.invoke('window:setAudioOutput', { id, deviceId }),
+  getAudioOutputDevices: async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      return devices
+        .filter(d => d.kind === 'audiooutput' && d.deviceId !== 'communications')
+        .map(d => ({ deviceId: d.deviceId, label: d.label }))
+    } catch { return [] }
+  },
   onWindowsUpdated: (callback) => {
     const handler = (_, windows) => callback(windows)
     ipcRenderer.on('windows:updated', handler)

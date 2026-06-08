@@ -102,6 +102,8 @@
           @rename-display="handleRenameDisplay"
           @set-zoom="(factor) => handleSetZoom(win.id, factor)"
           @set-muted="(muted) => handleSetMuted(win.id, muted)"
+          :audioOutputDevices="audioOutputDevices"
+          @set-audio-output="(deviceId) => handleSetAudioOutput(win.id, deviceId)"
         />
       </div>
     </main>
@@ -139,6 +141,7 @@ export default {
   setup() {
     const urlInput = ref('')
     const displays = ref([])
+    const audioOutputDevices = ref([])
     const customDisplayLabels = ref(JSON.parse(localStorage.getItem('displayLabels') || '{}'))
     const labelledDisplays = computed(() =>
       displays.value.map(d => ({ ...d, label: customDisplayLabels.value[d.id] || d.label }))
@@ -425,6 +428,14 @@ export default {
       await window.api.setMuted(id, muted)
     }
 
+    async function handleSetAudioOutput(id, deviceId) {
+      await window.api.setAudioOutput(id, deviceId)
+    }
+
+    async function refreshAudioOutputDevices() {
+      audioOutputDevices.value = await window.api.getAudioOutputDevices()
+    }
+
     function handleSetReload(id, enabled, interval) {
       interval = Math.max(1, interval || 1)
       const win = windows.value.find(w => w.id === id)
@@ -500,6 +511,8 @@ export default {
 
       thumbTimer = setInterval(refreshThumbnails, 2500)
       refreshThumbnails()
+      refreshAudioOutputDevices()
+      navigator.mediaDevices.addEventListener('devicechange', refreshAudioOutputDevices)
     }
 
     async function refreshThumbnails() {
@@ -637,6 +650,7 @@ export default {
       if (interactPollTimer) clearTimeout(interactPollTimer)
       if (resizeObserver) resizeObserver.disconnect()
       Object.keys(reloadTimers).forEach(id => clearReloadTimer(Number(id)))
+      navigator.mediaDevices.removeEventListener('devicechange', refreshAudioOutputDevices)
     })
 
     return {
@@ -647,7 +661,8 @@ export default {
       windowSettings, reloadCycleStarts,
       displayById, openWindow, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
       setWindowVisibility, toggleAlwaysOnTop, startMove, openDisplayPicker, doMove, selectDisplay, toggleInteractive, interactClick, interactScroll, interactKey,
-      handlePin, handleSetReload, handleApplyCss, handleRenameDisplay, handleSetZoom, handleSetMuted
+      handlePin, handleSetReload, handleApplyCss, handleRenameDisplay, handleSetZoom, handleSetMuted, handleSetAudioOutput,
+      audioOutputDevices
     }
   }
 }

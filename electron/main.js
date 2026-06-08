@@ -104,7 +104,8 @@ function buildWindowList() {
     alwaysOnTop: data.alwaysOnTop,
     customCSS: data.customCSS,
     zoomFactor: data.zoomFactor,
-    muted: data.muted
+    muted: data.muted,
+    audioOutputDeviceId: data.audioOutputDeviceId
   }))
 }
 
@@ -134,6 +135,28 @@ function enterFullscreen(win) {
   })
 }
 
+// ── Audio sink injection ──────────────────────────────────────
+// Injects JS that calls setSinkId on all audio/video elements and watches for new ones.
+// Note: AudioContext sources are not affected — setSinkId only works on HTMLMediaElement.
+
+function buildSinkScript(deviceId) {
+  return `(function(sinkId){
+    function applyToEl(el){if(typeof el.setSinkId==='function')el.setSinkId(sinkId).catch(()=>{})}
+    document.querySelectorAll('audio,video').forEach(applyToEl)
+    if(window.__sinkObs){window.__sinkObs.disconnect()}
+    window.__sinkObs=new MutationObserver(function(ms){
+      ms.forEach(function(m){
+        m.addedNodes.forEach(function(n){
+          if(!n||n.nodeType!==1)return
+          if(n.matches&&n.matches('audio,video'))applyToEl(n)
+          if(n.querySelectorAll)n.querySelectorAll('audio,video').forEach(applyToEl)
+        })
+      })
+    })
+    window.__sinkObs.observe(document.documentElement,{childList:true,subtree:true})
+  })(${JSON.stringify(deviceId)})`
+}
+
 // ── Blackout helpers ──────────────────────────────────────────
 // DOM manipulation is handled in browser-preload.js via IPC — avoids
 // executeJavaScript unreliability in Electron 29 on Windows.
@@ -159,7 +182,8 @@ function saveState() {
       displayId: d.displayId,
       alwaysOnTop: d.alwaysOnTop,
       customCSS: d.customCSS,
-      zoomFactor: d.zoomFactor
+      zoomFactor: d.zoomFactor,
+      audioOutputDeviceId: d.audioOutputDeviceId
     }))
   }
   try {
@@ -179,7 +203,7 @@ function loadState() {
 
 // ── Window factory ────────────────────────────────────────────
 
-function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false, customCSS = '', zoomFactor = 1 } = {}) {
+function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false, customCSS = '', zoomFactor = 1, audioOutputDeviceId = '' } = {}) {
   const allDisplays = screen.getAllDisplays()
   const display = allDisplays.find(d => d.id === displayId) || screen.getPrimaryDisplay()
 
@@ -207,7 +231,7 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
   }
 
   const id = nextId++
-  browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden, alwaysOnTop, customCSS, cssKey: null, canGoBack: false, canGoForward: false, zoomFactor, muted: false })
+  browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden, alwaysOnTop, customCSS, cssKey: null, canGoBack: false, canGoForward: false, zoomFactor, muted: false, audioOutputDeviceId })
   if (zoomFactor !== 1) win.webContents.setZoomFactor(zoomFactor)
 
   if (alwaysOnTop && !hidden) {
@@ -238,6 +262,7 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
     }
     if (data.zoomFactor && data.zoomFactor !== 1) win.webContents.setZoomFactor(data.zoomFactor)
     if (data.muted) win.webContents.setAudioMuted(true)
+    if (data.audioOutputDeviceId) await win.webContents.executeJavaScript(buildSinkScript(data.audioOutputDeviceId)).catch(() => {})
     if (data.blackout) applyBlackout(win)
   })
 
@@ -281,9 +306,9 @@ function restoreWindows() {
 
   const currentDisplayIds = new Set(screen.getAllDisplays().map(d => d.id))
 
-  for (const { url, displayId, alwaysOnTop, customCSS, zoomFactor } of state.windows) {
+  for (const { url, displayId, alwaysOnTop, customCSS, zoomFactor, audioOutputDeviceId } of state.windows) {
     const hidden = !currentDisplayIds.has(displayId)
-    openBrowserWindow(url, displayId, { hidden, alwaysOnTop: !hidden && !!alwaysOnTop, customCSS: customCSS || '', zoomFactor: zoomFactor || 1 })
+    openBrowserWindow(url, displayId, { hidden, alwaysOnTop: !hidden && !!alwaysOnTop, customCSS: customCSS || '', zoomFactor: zoomFactor || 1, audioOutputDeviceId: audioOutputDeviceId || '' })
   }
 
   notifyControlWindow()
@@ -596,6 +621,19 @@ ipcMain.handle('window:setMuted', (_, { id, muted }) => {
   notifyControlWindow()
 })
 
+ipcMain.handle('window:setAudioOutput', async (_, { id, deviceId }) => {
+  const data = browserWindows.get(id)
+  if (!data || data.win.isDestroyed()) return
+  data.audioOutputDeviceId = deviceId
+  if (deviceId) {
+    await data.win.webContents.executeJavaScript(buildSinkScript(deviceId)).catch(() => {})
+  } else {
+    await data.win.webContents.executeJavaScript(buildSinkScript('')).catch(() => {})
+  }
+  notifyControlWindow()
+  saveState()
+})
+
 ipcMain.handle('window:sendScroll', (_, { id, normX, normY, deltaX, deltaY }) => {
   const data = browserWindows.get(id)
   if (!data || data.win.isDestroyed() || data.hidden) return
@@ -614,6 +652,11 @@ ipcMain.handle('window:sendScroll', (_, { id, normX, normY, deltaX, deltaY }) =>
 app.whenReady().then(() => {
   const ua = session.defaultSession.getUserAgent().replace(/\s*Electron\/[\d.]+/, '')
   session.defaultSession.setUserAgent(ua)
+  // Grant speaker-selection permission so setSinkId works in browser windows
+  session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
+    if (permission === 'speaker-selection') return true
+    return null
+  })
   Menu.setApplicationMenu(null)
   createControlWindow()
   restoreWindows()

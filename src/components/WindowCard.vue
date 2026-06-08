@@ -192,6 +192,23 @@
           </div>
           <div class="wc-popover-divider"></div>
           <div class="wc-popover-row">
+            <div class="wc-popover-title">Audio Output</div>
+          </div>
+          <div class="wc-audio-select-wrap">
+            <select
+              class="wc-audio-select"
+              :value="win.audioOutputDeviceId || ''"
+              @change="$emit('set-audio-output', $event.target.value)"
+            >
+              <option value="">System default</option>
+              <option v-for="d in audioOutputDevices" :key="d.deviceId" :value="d.deviceId">
+                {{ d.label || d.deviceId }}
+              </option>
+            </select>
+          </div>
+          <div class="wc-audio-caveat">Only affects &lt;audio&gt; and &lt;video&gt; elements — Web Audio API sources are not routed.</div>
+          <div class="wc-popover-divider"></div>
+          <div class="wc-popover-row">
             <div class="wc-popover-title">Inject CSS</div>
             <button
               class="wc-switch"
@@ -301,7 +318,7 @@
         ref="cogBtnRef"
         @click="togglePopover()"
         class="action-btn action-btn-close"
-        :class="{ 'action-btn-cog-active': settings.autoReload || win.customCSS || (win.zoomFactor && win.zoomFactor !== 1) }"
+        :class="{ 'action-btn-cog-active': settings.autoReload || win.customCSS || (win.zoomFactor && win.zoomFactor !== 1) || win.audioOutputDeviceId }"
         title="Advanced settings"
       >
         <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -329,9 +346,10 @@ export default {
     thumbnail: { type: String, default: null },
     display: { type: Object, default: null },
     interactive: { type: Boolean, default: false },
-    settings: { type: Object, default: () => ({ autoReload: false, reloadInterval: 30 }) }
+    settings: { type: Object, default: () => ({ autoReload: false, reloadInterval: 30 }) },
+    audioOutputDevices: { type: Array, default: () => [] }
   },
-  emits: ['refresh', 'move', 'close', 'navigate', 'back', 'forward', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key', 'toggle-interactive', 'pin', 'set-reload', 'apply-css', 'rename-display', 'set-zoom', 'set-muted'],
+  emits: ['refresh', 'move', 'close', 'navigate', 'back', 'forward', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key', 'toggle-interactive', 'pin', 'set-reload', 'apply-css', 'rename-display', 'set-zoom', 'set-muted', 'set-audio-output'],
   setup(props, { emit }) {
     const editing = ref(false)
     const editUrl = ref('')
@@ -1326,6 +1344,63 @@ export default {
   background: rgba(248, 81, 73, 0.1);
   border-color: rgba(248, 81, 73, 0.4);
   color: var(--danger);
+}
+
+.wc-audio-select-wrap {
+  position: relative;
+}
+
+.wc-audio-select-wrap::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--text-secondary);
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.wc-audio-select {
+  width: 100%;
+  padding: 6px 28px 6px 10px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: border-color 0.12s;
+}
+
+.wc-audio-select:focus {
+  border-color: var(--accent);
+}
+
+.wc-audio-select option {
+  background: var(--bg-dark);
+  color: var(--text-primary);
+}
+
+.wc-audio-select option:checked {
+  background: linear-gradient(rgba(157, 119, 245, 0.25), rgba(157, 119, 245, 0.25));
+  color: var(--accent);
+}
+
+.wc-audio-caveat {
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  line-height: 1.4;
 }
 
 .wc-zoom-controls {
