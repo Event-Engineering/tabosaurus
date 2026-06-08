@@ -127,7 +127,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import WindowCard from './components/WindowCard.vue'
 import MonitorPicker from './components/MonitorPicker.vue'
 
@@ -161,6 +161,7 @@ export default {
       return recentUrls.value.filter(u => u.toLowerCase().includes(q))
     })
     let thumbTimer = null
+    let interactPollTimer = null
     let unsubscribe = null
     let unsubDisplays = null
     const interactThumbTimers = {}
@@ -525,6 +526,18 @@ export default {
       interactiveWindowId.value = interactiveWindowId.value === id ? null : id
     }
 
+    async function interactPoll(id) {
+      if (interactiveWindowId.value !== id) return
+      await refreshThumbnail(id)
+      if (interactiveWindowId.value === id)
+        interactPollTimer = setTimeout(() => interactPoll(id), 150)
+    }
+
+    watch(interactiveWindowId, (id) => {
+      if (interactPollTimer) { clearTimeout(interactPollTimer); interactPollTimer = null }
+      if (id) interactPoll(id)
+    })
+
     async function navigateWindow(id, url) {
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url
       await window.api.navigateWindow(id, url)
@@ -611,6 +624,7 @@ export default {
       if (unsubscribe) unsubscribe()
       if (unsubDisplays) unsubDisplays()
       if (thumbTimer) clearInterval(thumbTimer)
+      if (interactPollTimer) clearTimeout(interactPollTimer)
       if (resizeObserver) resizeObserver.disconnect()
       Object.keys(reloadTimers).forEach(id => clearReloadTimer(Number(id)))
     })
