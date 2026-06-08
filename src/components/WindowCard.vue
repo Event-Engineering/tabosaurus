@@ -259,7 +259,7 @@
         </svg>
         {{ settings.autoReload ? formatDuration(countdown) : 'Refresh' }}
       </button>
-      <button @click="$emit('move', $event.currentTarget.getBoundingClientRect())" class="action-btn" title="Move to another screen">
+      <button @click="emitMove($event)" class="action-btn" title="Move to another screen">
         <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
           <line x1="8" y1="21" x2="16" y2="21"></line>
@@ -485,14 +485,19 @@ export default {
     const localInterval = ref(30)
     const localIntervalText = ref('0:30')
     const cogBtnRef = ref(null)
-    const popoverPos = ref({ bottom: 0, right: 0 })
+    const popoverPos = ref({ bottom: 0, right: 0, maxH: 600, maxW: 400 })
 
-    const popoverStyle = computed(() => ({
-      position: 'fixed',
-      bottom: `${popoverPos.value.bottom}px`,
-      right: `${popoverPos.value.right}px`,
-      zIndex: 1000
-    }))
+    const popoverStyle = computed(() => {
+      const pos = popoverPos.value
+      return {
+        position: 'fixed',
+        bottom: `${pos.bottom}px`,
+        right: `${pos.right}px`,
+        maxHeight: `${pos.maxH}px`,
+        maxWidth: `${pos.maxW}px`,
+        zIndex: 1000
+      }
+    })
 
     function formatDuration(secs) {
       const m = Math.floor(secs / 60)
@@ -518,7 +523,12 @@ export default {
       if (openPopover.value) { openPopover.value = false; return }
       if (cogBtnRef.value) {
         const rect = cogBtnRef.value.getBoundingClientRect()
-        popoverPos.value = { bottom: window.innerHeight - rect.top + 6, right: window.innerWidth - rect.right }
+        popoverPos.value = {
+          bottom: window.innerHeight - rect.top + 6,
+          right: Math.max(20, window.innerWidth - rect.right),
+          maxH: rect.top - 12,
+          maxW: rect.right - 20
+        }
       }
       if (!localCss.value && props.win.customCSS) localCss.value = props.win.customCSS
       localInterval.value = props.settings?.reloadInterval ?? 30
@@ -610,11 +620,18 @@ export default {
       editingZoom.value = false
     }
 
+    function emitMove(e) {
+      const btn = e.currentTarget.getBoundingClientRect()
+      const card = e.currentTarget.closest('.card').getBoundingClientRect()
+      emit('move', { top: btn.top, bottom: btn.bottom, left: btn.left, right: btn.right, cardLeft: card.left, cardRight: card.right })
+    }
+
     return { editing, editUrl, urlInputRef, startEdit, confirmEdit, cancelEdit, onThumbnailClick, onThumbnailScroll, typing, typeBuffer, typeInputRef, onTypeKeydown,
       openPopover, localCss, localInterval, localIntervalText, cogBtnRef, popoverStyle, countdown,
       togglePopover, toggleCSSEnabled, clearCss, onIntervalBlur, toggleAutoReload, formatDuration,
       labelInputRef, editingLabel, labelDraft, startLabelEdit, saveLabelEdit, cancelLabelEdit,
-      currentZoom, zoomIn, zoomOut, editingZoom, zoomDraft, zoomInputRef, startZoomEdit, confirmZoomEdit, cancelZoomEdit }
+      currentZoom, zoomIn, zoomOut, editingZoom, zoomDraft, zoomInputRef, startZoomEdit, confirmZoomEdit, cancelZoomEdit,
+      emitMove }
   }
 }
 </script>
@@ -1207,6 +1224,7 @@ export default {
   flex-direction: column;
   gap: 8px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow-y: auto;
 }
 
 .wc-popover-title {

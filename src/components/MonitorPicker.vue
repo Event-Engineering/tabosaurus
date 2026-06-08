@@ -114,23 +114,27 @@ export default {
 
     const pickerStyle = computed(() => {
       if (!props.anchor) return {}
-      const GAP = 8
-      const W = 560
+      const GAP = 8, EDGE = 20
       const a = props.anchor
       const vw = window.innerWidth
       const vh = window.innerHeight
 
-      const nearTop = a.top < vh / 3
+      const cardW = a.cardLeft != null ? a.cardRight - a.cardLeft : null
+      const W = cardW != null ? Math.min(560, cardW) : 560
 
-      const vertical = nearTop
-        ? { top: (a.bottom + GAP) + 'px', bottom: 'auto' }
-        : { top: 'auto', bottom: (vh - a.top + GAP) + 'px' }
+      const spaceAbove = a.top - GAP
+      const spaceBelow = vh - a.bottom - GAP
+      const showAbove = a.cardLeft != null || spaceAbove > spaceBelow
+      const vertical = showAbove
+        ? { top: 'auto', bottom: (vh - a.top + GAP) + 'px' }
+        : { top: (a.bottom + GAP) + 'px', bottom: 'auto' }
 
-      const left = nearTop
-        ? Math.max(8, a.right - W)
-        : Math.min(Math.max(8, (a.left + a.right) / 2 - W / 2), vw - W - 8)
+      const idealLeft = a.cardLeft != null
+        ? (a.cardLeft + a.cardRight) / 2 - W / 2
+        : vw - EDGE - W
+      const horizontal = { left: Math.max(EDGE, idealLeft) + 'px', transform: 'none' }
 
-      return { position: 'absolute', ...vertical, left: left + 'px', transform: 'none' }
+      return { position: 'absolute', width: W + 'px', ...vertical, ...horizontal }
     })
 
     function select(displayId) {
