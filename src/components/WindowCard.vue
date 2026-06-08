@@ -193,6 +193,14 @@
           <div class="wc-popover-divider"></div>
           <div class="wc-popover-row">
             <div class="wc-popover-title">Audio Output</div>
+            <button
+              class="wc-switch"
+              :class="{ 'wc-switch-on': !win.muted }"
+              @click="$emit('set-muted', !win.muted)"
+              :title="win.muted ? 'Unmute' : 'Mute'"
+              role="switch"
+              :aria-checked="!win.muted"
+            ><span class="wc-switch-thumb"></span></button>
           </div>
           <div class="wc-audio-select-wrap">
             <select
@@ -298,27 +306,10 @@
         {{ win.blackout ? 'Unblack' : 'Blackout' }}
       </button>
       <button
-        @click="$emit('set-muted', !win.muted)"
-        class="action-btn action-btn-close"
-        :class="{ 'action-btn-muted': win.muted }"
-        :title="win.muted ? 'Unmute audio' : 'Mute audio'"
-      >
-        <svg v-if="!win.muted" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-        </svg>
-        <svg v-else width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-          <line x1="23" y1="9" x2="17" y2="15"></line>
-          <line x1="17" y1="9" x2="23" y2="15"></line>
-        </svg>
-      </button>
-      <button
         ref="cogBtnRef"
         @click="togglePopover()"
         class="action-btn action-btn-close"
-        :class="{ 'action-btn-cog-active': settings.autoReload || win.customCSS || (win.zoomFactor && win.zoomFactor !== 1) || win.audioOutputDeviceId }"
+        :class="{ 'action-btn-cog-active': settings.autoReload || win.customCSS || (win.zoomFactor && win.zoomFactor !== 1) || win.audioOutputDeviceId || win.muted }"
         title="Advanced settings"
       >
         <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -1193,15 +1184,6 @@ export default {
 .action-btn-autoreload:hover {
   background: rgba(157, 119, 245, 0.1);
   color: var(--accent);
-}
-
-.action-btn-muted {
-  color: var(--danger);
-}
-
-.action-btn-muted:hover {
-  background: rgba(248, 81, 73, 0.1);
-  color: var(--danger);
 }
 </style>
 
