@@ -99,6 +99,7 @@
           :settings="{ ...(windowSettings[win.id] || { autoReload: false, reloadInterval: 30 }), reloadStartedAt: reloadCycleStarts[win.id] }"
           @set-reload="({ enabled, interval }) => handleSetReload(win.id, enabled, interval)"
           @apply-css="({ css }) => handleApplyCss(win.id, css)"
+          @rename-display="handleRenameDisplay"
         />
       </div>
     </main>
@@ -106,7 +107,7 @@
     <MonitorPicker
       v-if="movingWindow"
       :win="movingWindow"
-      :displays="displays"
+      :displays="labelledDisplays"
       :anchor="moveAnchor"
       @move="doMove"
       @cancel="movingWindow = null"
@@ -114,7 +115,7 @@
     <MonitorPicker
       v-if="showDisplayPicker"
       :win="{ id: null, displayId: selectedDisplayId }"
-      :displays="displays"
+      :displays="labelledDisplays"
       :anchor="displayPickerAnchor"
       title="Open on Screen"
       instruction="Click a screen to open new windows there."
@@ -136,6 +137,10 @@ export default {
   setup() {
     const urlInput = ref('')
     const displays = ref([])
+    const customDisplayLabels = ref(JSON.parse(localStorage.getItem('displayLabels') || '{}'))
+    const labelledDisplays = computed(() =>
+      displays.value.map(d => ({ ...d, label: customDisplayLabels.value[d.id] || d.label }))
+    )
     const selectedDisplayId = ref(null)
     const windows = ref([])
     const thumbnails = ref({})
@@ -255,10 +260,18 @@ export default {
     })
 
     function displayById(id) {
-      return displays.value.find(d => d.id === id) || null
+      return labelledDisplays.value.find(d => d.id === id) || null
     }
 
-    const selectedDisplay = computed(() => displays.value.find(d => d.id === selectedDisplayId.value) || null)
+    const selectedDisplay = computed(() => labelledDisplays.value.find(d => d.id === selectedDisplayId.value) || null)
+
+    function handleRenameDisplay({ displayId, label }) {
+      const labels = { ...customDisplayLabels.value }
+      if (label.trim()) labels[displayId] = label.trim()
+      else delete labels[displayId]
+      customDisplayLabels.value = labels
+      localStorage.setItem('displayLabels', JSON.stringify(labels))
+    }
 
     function selectDisplay({ displayId }) {
       selectedDisplayId.value = displayId
@@ -603,14 +616,14 @@ export default {
     })
 
     return {
-      urlInput, displays, selectedDisplayId, selectedDisplay, windows, thumbnails, movingWindow, moveAnchor, showDisplayPicker, displayPickerAnchor, alwaysOnTop, interactiveWindowId,
+      urlInput, displays, labelledDisplays, selectedDisplayId, selectedDisplay, windows, thumbnails, movingWindow, moveAnchor, showDisplayPicker, displayPickerAnchor, alwaysOnTop, interactiveWindowId,
       recentUrls, filteredRecentUrls, showSuggestions, suggestionIndex, appVersion,
       hideSuggestions, selectSuggestion, handleSuggestionsKey, removeRecentUrl,
       mainRef, gridStyle,
       windowSettings, reloadCycleStarts,
       displayById, openWindow, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
       setWindowVisibility, toggleAlwaysOnTop, startMove, openDisplayPicker, doMove, selectDisplay, toggleInteractive, interactClick, interactScroll, interactKey,
-      handlePin, handleSetReload, handleApplyCss
+      handlePin, handleSetReload, handleApplyCss, handleRenameDisplay
     }
   }
 }

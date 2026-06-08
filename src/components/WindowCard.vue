@@ -104,8 +104,18 @@
         <template v-if="!editing">
           <div class="url" :title="win.url" @click="startEdit">{{ win.url }}</div>
           <div class="display-tag" v-if="display">
-            <span class="dot" :class="{ 'dot-primary': display.isPrimary }"></span>
-            {{ display.label }}
+            <span class="dot" :class="{ 'dot-primary': display.isPrimary }" :title="display.isPrimary ? 'Primary. Obviously.' : 'Secondary. Mysteriously.'"></span>
+            <input
+              v-if="editingLabel"
+              ref="labelInputRef"
+              class="display-label-input"
+              v-model="labelDraft"
+              @blur="saveLabelEdit"
+              @keydown.enter.prevent="$refs.labelInputRef.blur()"
+              @keydown.escape="cancelLabelEdit"
+              @click.stop
+            />
+            <span v-else class="display-label" @click.stop="startLabelEdit">{{ display.label }}</span>
           </div>
         </template>
         <template v-else>
@@ -285,11 +295,33 @@ export default {
     interactive: { type: Boolean, default: false },
     settings: { type: Object, default: () => ({ autoReload: false, reloadInterval: 30 }) }
   },
-  emits: ['refresh', 'move', 'close', 'navigate', 'back', 'forward', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key', 'toggle-interactive', 'pin', 'set-reload', 'apply-css'],
+  emits: ['refresh', 'move', 'close', 'navigate', 'back', 'forward', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key', 'toggle-interactive', 'pin', 'set-reload', 'apply-css', 'rename-display'],
   setup(props, { emit }) {
     const editing = ref(false)
     const editUrl = ref('')
     const urlInputRef = ref(null)
+    const labelInputRef = ref(null)
+    const editingLabel = ref(false)
+    const labelDraft = ref('')
+
+    function startLabelEdit() {
+      labelDraft.value = props.display?.label || ''
+      editingLabel.value = true
+      nextTick(() => {
+        labelInputRef.value?.select()
+      })
+    }
+
+    function saveLabelEdit() {
+      if (editingLabel.value) {
+        emit('rename-display', { displayId: props.display.id, label: labelDraft.value })
+        editingLabel.value = false
+      }
+    }
+
+    function cancelLabelEdit() {
+      editingLabel.value = false
+    }
     const typing = ref(false)
     const typeBuffer = ref('')
     const typeInputRef = ref(null)
@@ -491,7 +523,8 @@ export default {
 
     return { editing, editUrl, urlInputRef, startEdit, confirmEdit, cancelEdit, onThumbnailClick, onThumbnailScroll, typing, typeBuffer, typeInputRef, onTypeKeydown,
       openPopover, localCss, localInterval, localIntervalText, cogBtnRef, popoverStyle, countdown,
-      togglePopover, toggleCSSEnabled, clearCss, onIntervalBlur, toggleAutoReload, formatDuration }
+      togglePopover, toggleCSSEnabled, clearCss, onIntervalBlur, toggleAutoReload, formatDuration,
+      labelInputRef, editingLabel, labelDraft, startLabelEdit, saveLabelEdit, cancelLabelEdit }
   }
 }
 </script>
@@ -901,6 +934,38 @@ export default {
 
 .dot-primary {
   background: var(--accent);
+}
+
+.display-tag {
+  line-height: 1;
+}
+
+.display-label {
+  cursor: text;
+  border-radius: 2px;
+  line-height: 1;
+}
+
+.display-label:hover {
+  color: var(--text-primary);
+}
+
+.display-label-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--accent);
+  color: var(--text-primary);
+  font-size: inherit;
+  font-family: inherit;
+  line-height: 1;
+  height: 1em;
+  padding: 0;
+  margin: 0;
+  box-sizing: content-box;
+  outline: none;
+  width: 8em;
+  min-width: 4em;
+  max-width: 12em;
 }
 
 /* Actions */
