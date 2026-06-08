@@ -42,7 +42,7 @@
             <line x1="8" y1="21" x2="16" y2="21"></line>
             <line x1="12" y1="17" x2="12" y2="21"></line>
           </svg>
-          {{ selectedDisplay ? selectedDisplay.label : '' }}
+          <span class="btn-display-label">{{ selectedDisplay ? selectedDisplay.label : '' }}</span>
         </button>
         <button @click="openWindow" class="btn btn-primary" :disabled="!urlInput.trim()">
           Open
@@ -786,6 +786,10 @@ export default {
 .btn-display:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+@media (max-width: 550px) {
+  .btn-display-label { display: none; }
 }
 
 .btn-pin {
