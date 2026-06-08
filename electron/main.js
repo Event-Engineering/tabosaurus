@@ -102,7 +102,9 @@ function buildWindowList() {
     canGoBack: data.canGoBack,
     canGoForward: data.canGoForward,
     alwaysOnTop: data.alwaysOnTop,
-    customCSS: data.customCSS
+    customCSS: data.customCSS,
+    zoomFactor: data.zoomFactor,
+    muted: data.muted
   }))
 }
 
@@ -156,7 +158,8 @@ function saveState() {
       url: d.url,
       displayId: d.displayId,
       alwaysOnTop: d.alwaysOnTop,
-      customCSS: d.customCSS
+      customCSS: d.customCSS,
+      zoomFactor: d.zoomFactor
     }))
   }
   try {
@@ -176,7 +179,7 @@ function loadState() {
 
 // ── Window factory ────────────────────────────────────────────
 
-function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false, customCSS = '' } = {}) {
+function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false, customCSS = '', zoomFactor = 1 } = {}) {
   const allDisplays = screen.getAllDisplays()
   const display = allDisplays.find(d => d.id === displayId) || screen.getPrimaryDisplay()
 
@@ -204,7 +207,8 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
   }
 
   const id = nextId++
-  browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden, alwaysOnTop, customCSS, cssKey: null, canGoBack: false, canGoForward: false })
+  browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden, alwaysOnTop, customCSS, cssKey: null, canGoBack: false, canGoForward: false, zoomFactor, muted: false })
+  if (zoomFactor !== 1) win.webContents.setZoomFactor(zoomFactor)
 
   if (alwaysOnTop && !hidden) {
     if (process.platform === 'darwin') win.setAlwaysOnTop(true, 'floating')
@@ -232,6 +236,8 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
     if (data.customCSS) {
       data.cssKey = await win.webContents.insertCSS(data.customCSS).catch(() => null)
     }
+    if (data.zoomFactor && data.zoomFactor !== 1) win.webContents.setZoomFactor(data.zoomFactor)
+    if (data.muted) win.webContents.setAudioMuted(true)
     if (data.blackout) applyBlackout(win)
   })
 
@@ -275,9 +281,9 @@ function restoreWindows() {
 
   const currentDisplayIds = new Set(screen.getAllDisplays().map(d => d.id))
 
-  for (const { url, displayId, alwaysOnTop, customCSS } of state.windows) {
+  for (const { url, displayId, alwaysOnTop, customCSS, zoomFactor } of state.windows) {
     const hidden = !currentDisplayIds.has(displayId)
-    openBrowserWindow(url, displayId, { hidden, alwaysOnTop: !hidden && !!alwaysOnTop, customCSS: customCSS || '' })
+    openBrowserWindow(url, displayId, { hidden, alwaysOnTop: !hidden && !!alwaysOnTop, customCSS: customCSS || '', zoomFactor: zoomFactor || 1 })
   }
 
   notifyControlWindow()
@@ -571,6 +577,23 @@ ipcMain.handle('window:injectCSS', async (_, { id, css }) => {
   }
   notifyControlWindow()
   saveState()
+})
+
+ipcMain.handle('window:setZoom', (_, { id, factor }) => {
+  const data = browserWindows.get(id)
+  if (!data || data.win.isDestroyed()) return
+  data.zoomFactor = factor
+  data.win.webContents.setZoomFactor(factor)
+  notifyControlWindow()
+  saveState()
+})
+
+ipcMain.handle('window:setMuted', (_, { id, muted }) => {
+  const data = browserWindows.get(id)
+  if (!data || data.win.isDestroyed()) return
+  data.muted = muted
+  data.win.webContents.setAudioMuted(muted)
+  notifyControlWindow()
 })
 
 ipcMain.handle('window:sendScroll', (_, { id, normX, normY, deltaX, deltaY }) => {

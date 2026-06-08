@@ -100,6 +100,8 @@
           @set-reload="({ enabled, interval }) => handleSetReload(win.id, enabled, interval)"
           @apply-css="({ css }) => handleApplyCss(win.id, css)"
           @rename-display="handleRenameDisplay"
+          @set-zoom="(factor) => handleSetZoom(win.id, factor)"
+          @set-muted="(muted) => handleSetMuted(win.id, muted)"
         />
       </div>
     </main>
@@ -415,6 +417,14 @@ export default {
       await window.api.injectCSS(id, css)
     }
 
+    async function handleSetZoom(id, factor) {
+      await window.api.setZoom(id, factor)
+    }
+
+    async function handleSetMuted(id, muted) {
+      await window.api.setMuted(id, muted)
+    }
+
     function handleSetReload(id, enabled, interval) {
       interval = Math.max(1, interval || 1)
       const win = windows.value.find(w => w.id === id)
@@ -637,7 +647,7 @@ export default {
       windowSettings, reloadCycleStarts,
       displayById, openWindow, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
       setWindowVisibility, toggleAlwaysOnTop, startMove, openDisplayPicker, doMove, selectDisplay, toggleInteractive, interactClick, interactScroll, interactKey,
-      handlePin, handleSetReload, handleApplyCss, handleRenameDisplay
+      handlePin, handleSetReload, handleApplyCss, handleRenameDisplay, handleSetZoom, handleSetMuted
     }
   }
 }

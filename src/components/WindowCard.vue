@@ -173,6 +173,25 @@
           </label>
           <div class="wc-popover-divider"></div>
           <div class="wc-popover-row">
+            <div class="wc-popover-title">Zoom</div>
+            <div class="wc-zoom-controls">
+              <button class="wc-zoom-btn wc-zoom-reset" :style="{ visibility: currentZoom !== 1 ? 'visible' : 'hidden' }" @click="$emit('set-zoom', 1)" title="Reset to 100%">↺</button>
+              <button class="wc-zoom-btn" @click="zoomOut" :disabled="currentZoom <= 0.1">−</button>
+              <input
+                v-if="editingZoom"
+                ref="zoomInputRef"
+                class="wc-zoom-input"
+                v-model="zoomDraft"
+                @blur="confirmZoomEdit"
+                @keydown.enter.prevent="zoomInputRef.blur()"
+                @keydown.escape.prevent="cancelZoomEdit"
+              />
+              <span v-else class="wc-zoom-value" @click="startZoomEdit">{{ Math.round(currentZoom * 100) }}%</span>
+              <button class="wc-zoom-btn" @click="zoomIn" :disabled="currentZoom >= 5">+</button>
+            </div>
+          </div>
+          <div class="wc-popover-divider"></div>
+          <div class="wc-popover-row">
             <div class="wc-popover-title">Inject CSS</div>
             <button
               class="wc-switch"
@@ -262,10 +281,27 @@
         {{ win.blackout ? 'Unblack' : 'Blackout' }}
       </button>
       <button
+        @click="$emit('set-muted', !win.muted)"
+        class="action-btn action-btn-close"
+        :class="{ 'action-btn-muted': win.muted }"
+        :title="win.muted ? 'Unmute audio' : 'Mute audio'"
+      >
+        <svg v-if="!win.muted" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        </svg>
+        <svg v-else width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+          <line x1="23" y1="9" x2="17" y2="15"></line>
+          <line x1="17" y1="9" x2="23" y2="15"></line>
+        </svg>
+      </button>
+      <button
         ref="cogBtnRef"
         @click="togglePopover()"
         class="action-btn action-btn-close"
-        :class="{ 'action-btn-cog-active': settings.autoReload || win.customCSS }"
+        :class="{ 'action-btn-cog-active': settings.autoReload || win.customCSS || (win.zoomFactor && win.zoomFactor !== 1) }"
         title="Advanced settings"
       >
         <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -295,7 +331,7 @@ export default {
     interactive: { type: Boolean, default: false },
     settings: { type: Object, default: () => ({ autoReload: false, reloadInterval: 30 }) }
   },
-  emits: ['refresh', 'move', 'close', 'navigate', 'back', 'forward', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key', 'toggle-interactive', 'pin', 'set-reload', 'apply-css', 'rename-display'],
+  emits: ['refresh', 'move', 'close', 'navigate', 'back', 'forward', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key', 'toggle-interactive', 'pin', 'set-reload', 'apply-css', 'rename-display', 'set-zoom', 'set-muted'],
   setup(props, { emit }) {
     const editing = ref(false)
     const editUrl = ref('')
@@ -521,10 +557,46 @@ export default {
       { immediate: true }
     )
 
+    // ── Zoom ─────────────────────────────────────────────────────
+    const ZOOM_STEPS = [0.1, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0]
+    const currentZoom = computed(() => props.win.zoomFactor || 1.0)
+    const editingZoom = ref(false)
+    const zoomDraft = ref('')
+    const zoomInputRef = ref(null)
+
+    function zoomIn() {
+      const next = ZOOM_STEPS.find(s => s > currentZoom.value + 0.01)
+      if (next !== undefined) emit('set-zoom', next)
+    }
+
+    function zoomOut() {
+      const next = [...ZOOM_STEPS].reverse().find(s => s < currentZoom.value - 0.01)
+      if (next !== undefined) emit('set-zoom', next)
+    }
+
+    function startZoomEdit() {
+      zoomDraft.value = String(Math.round(currentZoom.value * 100))
+      editingZoom.value = true
+      nextTick(() => zoomInputRef.value?.select())
+    }
+
+    function confirmZoomEdit() {
+      const n = parseFloat(zoomDraft.value.replace('%', '').trim())
+      if (!isNaN(n) && n >= 10 && n <= 500) {
+        emit('set-zoom', Math.round(n) / 100)
+      }
+      editingZoom.value = false
+    }
+
+    function cancelZoomEdit() {
+      editingZoom.value = false
+    }
+
     return { editing, editUrl, urlInputRef, startEdit, confirmEdit, cancelEdit, onThumbnailClick, onThumbnailScroll, typing, typeBuffer, typeInputRef, onTypeKeydown,
       openPopover, localCss, localInterval, localIntervalText, cogBtnRef, popoverStyle, countdown,
       togglePopover, toggleCSSEnabled, clearCss, onIntervalBlur, toggleAutoReload, formatDuration,
-      labelInputRef, editingLabel, labelDraft, startLabelEdit, saveLabelEdit, cancelLabelEdit }
+      labelInputRef, editingLabel, labelDraft, startLabelEdit, saveLabelEdit, cancelLabelEdit,
+      currentZoom, zoomIn, zoomOut, editingZoom, zoomDraft, zoomInputRef, startZoomEdit, confirmZoomEdit, cancelZoomEdit }
   }
 }
 </script>
@@ -1087,6 +1159,15 @@ export default {
   background: rgba(157, 119, 245, 0.1);
   color: var(--accent);
 }
+
+.action-btn-muted {
+  color: var(--danger);
+}
+
+.action-btn-muted:hover {
+  background: rgba(248, 81, 73, 0.1);
+  color: var(--danger);
+}
 </style>
 
 <style>
@@ -1245,5 +1326,72 @@ export default {
   background: rgba(248, 81, 73, 0.1);
   border-color: rgba(248, 81, 73, 0.4);
   color: var(--danger);
+}
+
+.wc-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wc-zoom-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.12s;
+  font-family: inherit;
+}
+
+.wc-zoom-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.wc-zoom-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.wc-zoom-reset {
+  color: var(--accent);
+  border-color: rgba(157, 119, 245, 0.35);
+}
+
+.wc-zoom-reset:hover {
+  background: rgba(157, 119, 245, 0.12);
+  color: var(--accent);
+}
+
+.wc-zoom-value {
+  width: 36px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  cursor: text;
+}
+
+.wc-zoom-input {
+  width: 36px;
+  height: 24px;
+  box-sizing: border-box;
+  text-align: center;
+  font-size: 13px;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-dark);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text-primary);
+  outline: none;
+  padding: 0 2px;
 }
 </style>

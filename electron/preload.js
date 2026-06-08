@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('api', {
   setAlwaysOnTop: (enabled) => ipcRenderer.invoke('control:alwaysontop', { enabled }),
   setWindowAlwaysOnTop: (id, enabled) => ipcRenderer.invoke('window:alwaysOnTop', { id, enabled }),
   injectCSS: (id, css) => ipcRenderer.invoke('window:injectCSS', { id, css }),
+  setZoom: (id, factor) => ipcRenderer.invoke('window:setZoom', { id, factor }),
+  setMuted: (id, muted) => ipcRenderer.invoke('window:setMuted', { id, muted }),
   onWindowsUpdated: (callback) => {
     const handler = (_, windows) => callback(windows)
     ipcRenderer.on('windows:updated', handler)
