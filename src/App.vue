@@ -193,10 +193,19 @@ export default {
     const containerH = ref(0)
     let resizeObserver = null
 
-    // Card body (url row + actions) uses cqw units, adding a proportional
-    // height contribution on top of the thumbnail. Calibrated against 16:9:
-    // original C (0.663) minus pure thumbnail ratio (9/16 = 0.5625) = 0.1005.
+    // C_BODY used only for the column-count heuristic (effectiveC/computeCols).
     const C_BODY = 0.663 - 9 / 16
+    // Three card height regimes, derived from WindowCard.vue CSS (see memory/project-card-height-model.md):
+    //   Proportional  (cardW < ~573):  all controls scale with cqw
+    //   Transition    (~573–669):      icons/font capped, padding still proportional
+    //   Fully capped  (>~669):         everything at max
+    const C_PROP = (4 * 1.5 + 4.2 + 1.3 * 2.5) / 100  // proportional body slope (padding+icon+svg)
+    const K_PROP = 3                                     // body constant (1) + card border (2)
+    const C_PAD = 4 * 1.5 / 100                         // transition: only padding varies
+    const K_TRANS = 24 + 1.3 * 14 + 1                   // capped icon + capped svg + border
+    const W_ICONS_CAP = (24 / 4.2) * 100 + 2            // ~573px: icons/font cap here
+    const W_PAD_CAP = (10 / 1.5) * 100 + 2              // ~669px: padding caps here
+    const K_CAP = 4 * 10 + K_TRANS + 2                  // all-capped body + card border
 
     function cardAspectC(win) {
       const d = displays.value.find(d => d.id === win.displayId)
@@ -208,25 +217,8 @@ export default {
       return Math.max(...windows.value.map(w => cardAspectC(w) + C_BODY))
     }
 
-    // Returns an array of per-row max C values for a given column count.
-    // Row height = maxC_i × cardW + K, so total height = sum(maxC_i) × cardW + rows×K + gaps.
-    function rowMaxCs(cols) {
-      const n = windows.value.length
-      const count = Math.max(n, 1)
-      const rows = Math.ceil(count / cols)
-      const result = []
-      for (let r = 0; r < rows; r++) {
-        let maxC = -Infinity
-        for (let c = 0; c < cols && r * cols + c < n; c++) {
-          maxC = Math.max(maxC, cardAspectC(windows.value[r * cols + c]) + C_BODY)
-        }
-        result.push(maxC === -Infinity ? 9 / 16 + C_BODY : maxC)
-      }
-      return result
-    }
-
-    // Like rowMaxCs but returns only the display aspect ratio per row (no C_BODY).
-    // Used for the large-card height constraint where controls are at their clamp() caps.
+    // Returns the max display aspect ratio (height/width) per row for a given column count.
+    // Used by all three card height regimes via calcGridH / maxCardWForH.
     function rowMaxAspects(cols) {
       const n = windows.value.length
       const count = Math.max(n, 1)
@@ -250,31 +242,92 @@ export default {
       return cols
     }
 
-    // Two height models for maxCardW:
-    // 1. Proportional (accurate at small card widths): controls scale with cqw, C includes C_BODY
-    // 2. Capped (accurate at large card widths): controls hit clamp() caps ~85px, C is just display aspect
-    // Take the less restrictive (larger maxCardW) — the controls will actually fit.
+    function propGridH(sumAspect, cardW, rows, GAP) {
+      return (sumAspect + rows * C_PROP) * (cardW - 2) + rows * K_PROP + (rows - 1) * GAP
+    }
+    function propMaxCardW(sumAspect, H, rows, GAP) {
+      return (H - rows * K_PROP - (rows - 1) * GAP) / (sumAspect + rows * C_PROP) + 2
+    }
+    function transGridH(sumAspect, cardW, rows, GAP) {
+      return (sumAspect + rows * C_PAD) * (cardW - 2) + rows * (K_TRANS + 2) + (rows - 1) * GAP
+    }
+    function transMaxCardW(sumAspect, H, rows, GAP) {
+      return (H - rows * (K_TRANS + 2) - (rows - 1) * GAP) / (sumAspect + rows * C_PAD) + 2
+    }
+    function capGridH(sumAspect, cardW, rows, GAP) {
+      return sumAspect * (cardW - 2) + rows * K_CAP + (rows - 1) * GAP
+    }
+    function capMaxCardW(sumAspect, H, rows, GAP) {
+      return (H - rows * K_CAP - (rows - 1) * GAP) / sumAspect + 2
+    }
+    function calcGridH(sumAspect, cardW, rows, GAP) {
+      if (cardW >= W_PAD_CAP) return capGridH(sumAspect, cardW, rows, GAP)
+      if (cardW >= W_ICONS_CAP) return transGridH(sumAspect, cardW, rows, GAP)
+      return propGridH(sumAspect, cardW, rows, GAP)
+    }
+    function maxCardWForH(sumAspect, H, rows, GAP) {
+      const mCap = capMaxCardW(sumAspect, H, rows, GAP)
+      if (mCap >= W_PAD_CAP) return mCap
+      const mTrans = transMaxCardW(sumAspect, H, rows, GAP)
+      if (mTrans >= W_ICONS_CAP) return mTrans
+      return propMaxCardW(sumAspect, H, rows, GAP)
+    }
+
     const cardLayout = computed(() => {
       const n = windows.value.length
       if (n === 0 || !containerW.value || !containerH.value) return null
-      const W = containerW.value, H = containerH.value, GAP = 20, K = 15
+      const W = containerW.value, H = containerH.value, GAP = 20
       const cols = computeCols(n, W, H)
       const rows = Math.ceil(n / cols)
-      const sumC = rowMaxCs(cols).reduce((a, b) => a + b, 0)
       const sumAspect = rowMaxAspects(cols).reduce((a, b) => a + b, 0)
-      const maxCardW = Math.max(
-        (H - K * rows - GAP * (rows - 1)) / sumC,
-        (H - 85 * rows - GAP * (rows - 1)) / sumAspect
-      )
-      return { cols, cardW: Math.min((W - GAP * (cols - 1)) / cols, maxCardW) }
+      const maxCW = maxCardWForH(sumAspect, H, rows, GAP)
+      return { cols, cardW: Math.min((W - GAP * (cols - 1)) / cols, maxCW) }
     })
+
+    const oversized = computed(() => {
+      const layout = cardLayout.value
+      if (!layout || !containerW.value || !containerH.value) return { wide: false, tall: false }
+      const { cols, cardW } = layout
+      const n = windows.value.length
+      const GAP = 20
+      const rows = Math.ceil(n / cols)
+      const sumAspect = rowMaxAspects(cols).reduce((a, b) => a + b, 0)
+      const idealW = cols * cardW + (cols - 1) * GAP
+      const idealH = calcGridH(sumAspect, cardW, rows, GAP)
+      return {
+        wide: containerW.value > idealW + 2,
+        tall: containerH.value > idealH + 2
+      }
+    })
+
+    function trimLayout() {
+      const layout = cardLayout.value
+      if (!layout) return
+      const { cols, cardW } = layout
+      const n = windows.value.length
+      const GAP = 20, MAIN_PAD = 40, MIN_CARD_W = 410
+      const headerEl = document.querySelector('.header')
+      const HEADER_H = headerEl ? headerEl.offsetHeight : 64
+      const rows = Math.ceil(n / cols)
+      const sumAspect = rowMaxAspects(cols).reduce((a, b) => a + b, 0)
+      const w = Math.max(cols * cardW + (cols - 1) * GAP + MAIN_PAD, headerFixedW())
+      const cardH = calcGridH(sumAspect, cardW, rows, GAP)
+      const h = Math.ceil(cardH + MAIN_PAD + HEADER_H)
+      const chromeW = window.outerWidth - window.innerWidth
+      const chromeH = window.outerHeight - window.innerHeight
+      const minW = Math.max(cols * MIN_CARD_W + (cols - 1) * GAP + MAIN_PAD, headerFixedW())
+      const minCardH = calcGridH(sumAspect, MIN_CARD_W, rows, GAP)
+      const minH = Math.ceil(minCardH) + MAIN_PAD + HEADER_H
+      window.api.setMinimumSize(Math.round(minW) + chromeW, Math.round(minH) + chromeH)
+      window.api.setContentSize(Math.round(w), h)
+    }
 
     const gridStyle = computed(() => {
       const layout = cardLayout.value
       if (!layout) return {}
       const { cols, cardW } = layout
       const GAP = 20
-      const maxW = Math.round(cols * cardW + GAP * (cols - 1))
+      const maxW = cols * cardW + GAP * (cols - 1)
       return { gridTemplateColumns: `repeat(${cols}, 1fr)`, maxWidth: `${maxW}px` }
     })
 
@@ -313,24 +366,24 @@ export default {
     function updateMinimumSize() {
       const n = windows.value.length
       if (!n || !containerW.value || !containerH.value) return
-      const GAP = 20, K = 15, MAIN_PAD = 40, MIN_CARD_W = 410
+      const GAP = 20, MAIN_PAD = 40, MIN_CARD_W = 410
       const headerEl = document.querySelector('.header')
       const HEADER_H = headerEl ? headerEl.offsetHeight : 64
 
       const cols = computeCols(n, containerW.value, containerH.value)
       const rows = Math.ceil(n / cols)
-      const sumC = rowMaxCs(cols).reduce((a, b) => a + b, 0)
+      const sumAspect = rowMaxAspects(cols).reduce((a, b) => a + b, 0)
 
       const chromeW = window.outerWidth - window.innerWidth
       const chromeH = window.outerHeight - window.innerHeight
       const minW = Math.max(cols * MIN_CARD_W + (cols - 1) * GAP + MAIN_PAD, headerFixedW())
-      const minH = Math.round(sumC * MIN_CARD_W + rows * K + (rows - 1) * GAP) + MAIN_PAD + HEADER_H
+      const minH = Math.round(calcGridH(sumAspect, MIN_CARD_W, rows, GAP)) + MAIN_PAD + HEADER_H
       window.api.setMinimumSize(Math.round(minW) + chromeW, Math.round(minH) + chromeH)
     }
 
     function fitWindowToCards(n, savedCardW = null, prevCount = 0, savedCols = 0) {
       const count = Math.max(n, 1)
-      const GAP = 20, K = 15, MAIN_PAD = 40, MIN_CARD_W = 410
+      const GAP = 20, MAIN_PAD = 40, MIN_CARD_W = 410
 
       const primary = displays.value.find(d => d.isPrimary) || displays.value[0]
       const defaultCardW = primary ? Math.round(primary.bounds.width * 0.27) : 480
@@ -348,17 +401,16 @@ export default {
         ? Math.max(1, Math.min(savedCols, count))
         : Math.max(1, Math.min(count, Math.round(Math.sqrt(count))))
       const rows = Math.ceil(count / cols)
-      const rowCs = rowMaxCs(cols)
-      const sumC = rowCs.reduce((a, b) => a + b, 0)
+      const sumAspect = rowMaxAspects(cols).reduce((a, b) => a + b, 0)
       const w = Math.max(cols * CARD_W + (cols - 1) * GAP + MAIN_PAD, headerFixedW())
-      const h = sumC * CARD_W + rows * K + (rows - 1) * GAP + MAIN_PAD + HEADER_H
+      const h = calcGridH(sumAspect, CARD_W, rows, GAP) + MAIN_PAD + HEADER_H
 
       // Update minimum BEFORE setContentSize — Electron silently rejects a resize that
       // falls below the current minimum, so the new minimum must be applied first.
       const chromeW = window.outerWidth - window.innerWidth
       const chromeH = window.outerHeight - window.innerHeight
       const minW = Math.max(cols * MIN_CARD_W + (cols - 1) * GAP + MAIN_PAD, headerFixedW())
-      const minH = Math.round(sumC * MIN_CARD_W + rows * K + (rows - 1) * GAP) + MAIN_PAD + HEADER_H
+      const minH = Math.round(calcGridH(sumAspect, MIN_CARD_W, rows, GAP)) + MAIN_PAD + HEADER_H
       window.api.setMinimumSize(Math.round(minW) + chromeW, Math.round(minH) + chromeH)
       window.api.setContentSize(Math.round(w), Math.round(h))
     }
@@ -488,15 +540,15 @@ export default {
         const prevDisplayById = new Map(windows.value.map(w => [w.id, w.displayId]))
         const prevCount = windows.value.length
 
-        // Capture current card width BEFORE updating windows.value so effectiveC / rowMaxCs
-        // still reflect the previous layout when we compute it.
+        // Capture current card width BEFORE updating windows.value so rowMaxAspects
+        // still reflects the previous layout when we compute it.
         let savedCardW = null, savedCols = 0
         if (prevCount > 0 && containerW.value > 0 && containerH.value > 0) {
-          const GAP = 20, K = 15
+          const GAP = 20
           savedCols = computeCols(prevCount, containerW.value, containerH.value)
           const rows = Math.ceil(prevCount / savedCols)
-          const sumC = rowMaxCs(savedCols).reduce((a, b) => a + b, 0)
-          const maxCW = (containerH.value - K * rows - GAP * (rows - 1)) / sumC
+          const sumAspect = rowMaxAspects(savedCols).reduce((a, b) => a + b, 0)
+          const maxCW = maxCardWForH(sumAspect, containerH.value, rows, GAP)
           const cw = Math.min((containerW.value - GAP * (savedCols - 1)) / savedCols, maxCW)
           if (cw >= 200) savedCardW = Math.round(cw)
         }
@@ -679,7 +731,7 @@ export default {
       urlInput, displays, labelledDisplays, selectedDisplayId, selectedDisplay, windows, thumbnails, movingWindow, moveAnchor, showDisplayPicker, displayPickerAnchor, alwaysOnTop, interactiveWindowId,
       recentUrls, filteredRecentUrls, showSuggestions, suggestionIndex, appVersion,
       hideSuggestions, selectSuggestion, handleSuggestionsKey, removeRecentUrl,
-      mainRef, gridStyle,
+      mainRef, gridStyle, oversized, trimLayout,
       windowSettings, reloadCycleStarts,
       displayById, openWindow, resetLayout, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
       setWindowVisibility, toggleAlwaysOnTop, startMove, openDisplayPicker, doMove, selectDisplay, toggleInteractive, interactClick, interactScroll, interactKey,
