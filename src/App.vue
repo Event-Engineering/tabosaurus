@@ -51,13 +51,13 @@
           v-if="windows.length > 0"
           @click="resetLayout"
           class="btn btn-pin"
-          title="Fit window to cards"
+          title="Reset to default layout"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="4 14 4 20 10 20"></polyline>
-            <polyline points="20 10 20 4 14 4"></polyline>
-            <line x1="14" y1="10" x2="20" y2="4"></line>
-            <line x1="4" y1="20" x2="10" y2="14"></line>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
           </svg>
         </button>
         <button
@@ -88,7 +88,22 @@
         <p class="empty-version" v-if="appVersion">v{{ appVersion }}</p>
       </div>
 
-      <div v-else class="window-grid" :style="gridStyle">
+      <template v-else>
+      <button
+        v-if="oversized.wide || oversized.tall"
+        @click="trimLayout"
+        class="btn-trim"
+        title="Shrink window to fit cards"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="10 4 10 10 4 10"></polyline>
+          <polyline points="14 20 14 14 20 14"></polyline>
+          <line x1="4" y1="4" x2="10" y2="10"></line>
+          <line x1="20" y1="20" x2="14" y2="14"></line>
+        </svg>
+      </button>
+
+      <div class="window-grid" :style="gridStyle">
         <WindowCard
           v-for="win in windows"
           :key="win.id"
@@ -119,6 +134,7 @@
           @set-audio-output="(deviceId) => handleSetAudioOutput(win.id, deviceId)"
         />
       </div>
+      </template>
     </main>
 
     <MonitorPicker
@@ -933,6 +949,30 @@ export default {
   flex: 1;
   overflow: hidden;
   padding: 20px;
+  position: relative;
+}
+
+.btn-trim {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  padding: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+  transition: box-shadow 0.15s, transform 0.1s;
+  cursor: pointer;
+}
+
+.btn-trim:hover {
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.5);
+  transform: scale(1.08);
 }
 
 .empty-state {
