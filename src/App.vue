@@ -111,6 +111,7 @@
           :win="win"
           :thumbnail="thumbnails[win.id]"
           :display="displayById(win.displayId)"
+          :default-display-label="displays.find(d => d.id === win.displayId)?.label || ''"
           :interactive="win.id === interactiveWindowId"
           @refresh="refreshWindow(win.id)"
           @close="closeWindow(win.id)"

@@ -105,16 +105,34 @@
           <div class="url" :title="win.url" @click="startEdit">{{ win.url }}</div>
           <div class="display-tag" v-if="display">
             <span class="dot" :class="{ 'dot-primary': display.isPrimary }" :title="display.isPrimary ? 'Primary. Obviously.' : 'Secondary. Mysteriously.'"></span>
-            <input
-              v-if="editingLabel"
-              ref="labelInputRef"
-              class="display-label-input"
-              v-model="labelDraft"
-              @blur="saveLabelEdit"
-              @keydown.enter.prevent="$refs.labelInputRef.blur()"
-              @keydown.escape="cancelLabelEdit"
-              @click.stop
-            />
+            <template v-if="editingLabel">
+              <input
+                ref="labelInputRef"
+                class="display-label-input"
+                v-model="labelDraft"
+                @blur="saveLabelEdit"
+                @keydown.enter.prevent="$refs.labelInputRef.blur()"
+                @keydown.escape="cancelLabelEdit"
+                @click.stop
+              />
+              <button
+                v-if="defaultDisplayLabel && display.label !== defaultDisplayLabel"
+                class="label-cancel-btn"
+                @mousedown.prevent="resetLabelEdit"
+                @click.stop
+                title="Reset to default name"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                  <path d="M3 3v5h5"/>
+                </svg>
+              </button>
+              <button class="label-cancel-btn" @mousedown.prevent="cancelLabelEdit" @click.stop title="Cancel">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </template>
             <span v-else class="display-label" @click.stop="startLabelEdit">{{ display.label }}</span>
           </div>
         </template>
@@ -336,6 +354,7 @@ export default {
     win: { type: Object, required: true },
     thumbnail: { type: String, default: null },
     display: { type: Object, default: null },
+    defaultDisplayLabel: { type: String, default: '' },
     interactive: { type: Boolean, default: false },
     settings: { type: Object, default: () => ({ autoReload: false, reloadInterval: 30 }) },
     audioOutputDevices: { type: Array, default: () => [] }
@@ -348,6 +367,7 @@ export default {
     const labelInputRef = ref(null)
     const editingLabel = ref(false)
     const labelDraft = ref('')
+    let cancellingLabel = false
 
     function startLabelEdit() {
       labelDraft.value = props.display?.label || ''
@@ -358,6 +378,7 @@ export default {
     }
 
     function saveLabelEdit() {
+      if (cancellingLabel) { cancellingLabel = false; return }
       if (editingLabel.value) {
         emit('rename-display', { displayId: props.display.id, label: labelDraft.value })
         editingLabel.value = false
@@ -365,6 +386,13 @@ export default {
     }
 
     function cancelLabelEdit() {
+      cancellingLabel = true
+      editingLabel.value = false
+    }
+
+    function resetLabelEdit() {
+      cancellingLabel = true
+      emit('rename-display', { displayId: props.display.id, label: '' })
       editingLabel.value = false
     }
     const typing = ref(false)
@@ -620,7 +648,7 @@ export default {
     return { editing, editUrl, urlInputRef, startEdit, confirmEdit, cancelEdit, onThumbnailClick, onThumbnailScroll, typing, typeBuffer, typeInputRef, onTypeKeydown,
       openPopover, localCss, localInterval, localIntervalText, cogBtnRef, popoverStyle, countdown,
       togglePopover, toggleCSSEnabled, clearCss, onIntervalBlur, toggleAutoReload, formatDuration,
-      labelInputRef, editingLabel, labelDraft, startLabelEdit, saveLabelEdit, cancelLabelEdit,
+      labelInputRef, editingLabel, labelDraft, startLabelEdit, saveLabelEdit, cancelLabelEdit, resetLabelEdit,
       currentZoom, zoomIn, zoomOut, editingZoom, zoomDraft, zoomInputRef, startZoomEdit, confirmZoomEdit, cancelZoomEdit,
       emitMove }
   }
@@ -1064,6 +1092,25 @@ export default {
   width: 8em;
   min-width: 4em;
   max-width: 12em;
+}
+
+.label-cancel-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 2px;
+  margin-left: 2px;
+  color: var(--text-secondary);
+  border-radius: 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.label-cancel-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 /* Actions */
