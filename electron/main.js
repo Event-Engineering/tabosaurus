@@ -404,7 +404,7 @@ ipcMain.handle('window:visibility', async (_, { id, hidden }) => {
   data.hidden = hidden
   if (hidden) {
     await exitFullscreen(data.win)
-    data.win.minimize()
+    data.win.hide()
   } else {
     // Fall back to primary if the target display is no longer connected
     let display = screen.getAllDisplays().find(d => d.id === data.displayId)
@@ -412,7 +412,7 @@ ipcMain.handle('window:visibility', async (_, { id, hidden }) => {
       display = screen.getPrimaryDisplay()
       data.displayId = display.id
     }
-    data.win.show()
+    data.win.showInactive()
     data.win.setBounds(display.bounds)
     await enterFullscreen(data.win)
   }
