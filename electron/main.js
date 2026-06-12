@@ -426,6 +426,22 @@ ipcMain.handle('window:move', async (_, { id, displayId }) => {
   const display = screen.getAllDisplays().find(d => d.id === displayId)
   if (!display) return
 
+  if (data.hidden) {
+    if (data.alwaysOnTop) {
+      const conflictOnDest = Array.from(browserWindows.values()).some(
+        d => d !== data && d.displayId === displayId && d.alwaysOnTop
+      )
+      if (conflictOnDest) {
+        data.alwaysOnTop = false
+        data.win.setAlwaysOnTop(false)
+      }
+    }
+    data.displayId = displayId
+    notifyControlWindow()
+    saveState()
+    return
+  }
+
   await exitFullscreen(data.win)
 
   if (data.alwaysOnTop) {
