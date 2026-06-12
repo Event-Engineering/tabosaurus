@@ -43,5 +43,10 @@ contextBridge.exposeInMainWorld('api', {
     const handler = (_, displays) => callback(displays)
     ipcRenderer.on('displays:updated', handler)
     return () => ipcRenderer.removeListener('displays:updated', handler)
+  },
+  onMaximized: (callback) => {
+    const handler = (_, maximized) => callback(maximized)
+    ipcRenderer.on('control:maximized', handler)
+    return () => ipcRenderer.removeListener('control:maximized', handler)
   }
 })

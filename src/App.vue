@@ -52,6 +52,7 @@
           @click="resetLayout"
           class="btn btn-pin"
           title="Reset to default layout"
+          :disabled="isMaximized"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="7" height="7" rx="1"></rect>
@@ -90,7 +91,7 @@
 
       <template v-else>
       <button
-        v-if="oversized.wide || oversized.tall"
+        v-if="!isMaximized && (oversized.wide || oversized.tall)"
         @click="trimLayout"
         class="btn-trim"
         title="Shrink window to fit cards"
@@ -196,6 +197,8 @@ export default {
     let interactPollTimer = null
     let unsubscribe = null
     let unsubDisplays = null
+    let unsubMaximized = null
+    const isMaximized = ref(false)
     const interactThumbTimers = {}
     const windowSettings = ref({})
     const reloadTimers = {}
@@ -591,6 +594,8 @@ export default {
         }
       })
 
+      unsubMaximized = window.api.onMaximized(maximized => { isMaximized.value = maximized })
+
       thumbTimer = setInterval(refreshThumbnails, 2500)
       refreshThumbnails()
       refreshAudioOutputDevices()
@@ -734,6 +739,7 @@ export default {
     onUnmounted(() => {
       if (unsubscribe) unsubscribe()
       if (unsubDisplays) unsubDisplays()
+      if (unsubMaximized) unsubMaximized()
       if (thumbTimer) clearInterval(thumbTimer)
       if (interactPollTimer) clearTimeout(interactPollTimer)
       if (resizeObserver) resizeObserver.disconnect()
@@ -745,7 +751,7 @@ export default {
       urlInput, displays, labelledDisplays, selectedDisplayId, selectedDisplay, windows, thumbnails, movingWindow, moveAnchor, showDisplayPicker, displayPickerAnchor, alwaysOnTop, interactiveWindowId,
       recentUrls, filteredRecentUrls, showSuggestions, suggestionIndex, appVersion,
       hideSuggestions, selectSuggestion, handleSuggestionsKey, removeRecentUrl,
-      mainRef, gridStyle, oversized, trimLayout,
+      mainRef, gridStyle, oversized, trimLayout, isMaximized,
       windowSettings, reloadCycleStarts,
       displayById, openWindow, resetLayout, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
       setWindowVisibility, toggleAlwaysOnTop, startMove, openDisplayPicker, doMove, selectDisplay, toggleInteractive, interactClick, interactScroll, interactKey,

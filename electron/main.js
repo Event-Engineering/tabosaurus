@@ -62,6 +62,13 @@ function createControlWindow() {
 
   controlWindow.on('resize', debouncedSaveState)
 
+  controlWindow.on('maximize', () => {
+    if (!controlWindow.isDestroyed()) controlWindow.webContents.send('control:maximized', true)
+  })
+  controlWindow.on('unmaximize', () => {
+    if (!controlWindow.isDestroyed()) controlWindow.webContents.send('control:maximized', false)
+  })
+
   controlWindow.on('closed', () => {
     controlWindow = null
     app.quit()
