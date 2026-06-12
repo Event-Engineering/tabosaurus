@@ -150,8 +150,6 @@
       :win="{ id: null, displayId: selectedDisplayId }"
       :displays="labelledDisplays"
       :anchor="displayPickerAnchor"
-      title="Open on Screen"
-      instruction="Click a screen to open new windows there."
       :allowCurrent="true"
       @move="selectDisplay"
       @cancel="showDisplayPicker = false"

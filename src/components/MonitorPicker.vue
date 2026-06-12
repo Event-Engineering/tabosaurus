@@ -1,16 +1,6 @@
 <template>
   <div class="overlay" @click.self="$emit('cancel')">
     <div class="picker" :style="pickerStyle">
-      <div class="picker-header">
-        <h3>{{ title }}</h3>
-        <button @click="$emit('cancel')" class="close-btn" title="Cancel">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-
       <div class="picker-body">
         <div v-if="displays.length <= 1" class="single-display-msg">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.4">
@@ -23,7 +13,6 @@
         </div>
 
         <template v-else>
-          <p class="instruction">{{ instruction }}</p>
           <div class="layout-wrap">
             <div
               class="layout"
@@ -69,8 +58,6 @@ export default {
   props: {
     win: { type: Object, required: true },
     displays: { type: Array, required: true },
-    title: { type: String, default: 'Move to Screen' },
-    instruction: { type: String, default: 'Click a screen to move the window there.' },
     allowCurrent: { type: Boolean, default: false },
     anchor: { type: Object, default: null }
   },
@@ -120,7 +107,7 @@ export default {
       const vh = window.innerHeight
 
       const cardW = a.cardLeft != null ? a.cardRight - a.cardLeft : null
-      const W = cardW != null ? Math.min(560, cardW) : 560
+      const W = cardW != null ? Math.min(420, cardW) : 420
 
       const spaceAbove = a.top - GAP
       const spaceBelow = vh - a.bottom - GAP
@@ -162,50 +149,14 @@ export default {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  width: 560px;
+  width: 420px;
   max-width: 92vw;
   overflow: hidden;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-.picker-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-}
-
-.picker-header h3 {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.close-btn {
-  background: transparent;
-  color: var(--text-secondary);
-  padding: 4px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.12s, color 0.12s;
-}
-
-.close-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
 .picker-body {
-  padding: 16px 20px;
-}
-
-.instruction {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-bottom: 14px;
-  text-align: center;
+  padding: 12px 14px;
 }
 
 .layout-wrap {
