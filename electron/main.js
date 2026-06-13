@@ -4,18 +4,8 @@ const fs = require('fs')
 
 let controlWindow = null
 const browserWindows = new Map() // id -> { win, url, displayId, blackout, hidden }
+const lastActiveBrowserPerDisplay = new Map() // displayId -> browser window id
 let nextId = 1
-
-// Ensures the control window sits above any browser window that was just raised.
-// On macOS this is a no-op — level hierarchy ('screen-saver' > 'floating') handles it.
-// On Windows there are no levels, so we re-apply alwaysOnTop to move it to the top of
-// the TOPMOST z-order stack.
-function raiseControlWindow() {
-  if (process.platform === 'darwin') return
-  if (!controlWindow || controlWindow.isDestroyed() || !controlWindow.isAlwaysOnTop()) return
-  controlWindow.setAlwaysOnTop(false)
-  controlWindow.setAlwaysOnTop(true)
-}
 
 // ── Control window ────────────────────────────────────────────
 
@@ -68,6 +58,43 @@ function createControlWindow() {
   controlWindow.on('unmaximize', () => {
     if (!controlWindow.isDestroyed()) controlWindow.webContents.send('control:maximized', false)
   })
+
+  if (process.platform !== 'darwin') {
+    // On Windows, the taskbar can climb above browser windows in the TOPMOST band when
+    // focus shifts. Delay slightly so our moveTop() fires after the taskbar has reasserted,
+    // not before. Raise in two passes: non-pinned first, pinned last, control on top.
+    controlWindow.on('focus', () => {
+      setTimeout(() => {
+        if (!controlWindow || controlWindow.isDestroyed()) return
+        const raisedDisplays = new Set()
+        // Pass 1: raise one non-pinned browser per display (last-active, or any).
+        // Skip displays that have a pinned browser — the pinned pass covers those.
+        const pinnedDisplays = new Set()
+        for (const data of browserWindows.values()) {
+          if (!data.win.isDestroyed() && !data.hidden && data.alwaysOnTop) pinnedDisplays.add(data.displayId)
+        }
+        for (const [displayId, browserId] of lastActiveBrowserPerDisplay.entries()) {
+          if (pinnedDisplays.has(displayId)) continue
+          const data = browserWindows.get(browserId)
+          if (data && !data.win.isDestroyed() && !data.hidden && !data.alwaysOnTop) {
+            data.win.moveTop()
+            raisedDisplays.add(displayId)
+          }
+        }
+        for (const data of browserWindows.values()) {
+          if (!data.win.isDestroyed() && !data.hidden && !data.alwaysOnTop && !raisedDisplays.has(data.displayId) && !pinnedDisplays.has(data.displayId)) {
+            data.win.moveTop()
+            raisedDisplays.add(data.displayId)
+          }
+        }
+        // Pass 2: raise pinned browsers (ends up above non-pinned on each display).
+        for (const data of browserWindows.values()) {
+          if (!data.win.isDestroyed() && !data.hidden && data.alwaysOnTop) data.win.moveTop()
+        }
+        controlWindow.moveTop()
+      }, 50)
+    })
+  }
 
   controlWindow.on('closed', () => {
     controlWindow = null
@@ -146,8 +173,9 @@ function enterFullscreen(win) {
       win.setSimpleFullScreen(true)
       setTimeout(resolve, 200)
     } else {
-      win.once('enter-full-screen', resolve)
-      win.setFullScreen(true)
+      // Windows: window is already frame: false and positioned to display bounds.
+      // setFullScreen resets the TOPMOST flag mid-transition, breaking z-order.
+      resolve()
     }
   })
 }
@@ -241,12 +269,8 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
     }
   })
 
-  if (!hidden) {
-    if (process.platform === 'darwin') {
-      win.setSimpleFullScreen(true)
-    } else {
-      win.setFullScreen(true)
-    }
+  if (!hidden && process.platform === 'darwin') {
+    win.setSimpleFullScreen(true)
   }
 
   const id = nextId++
@@ -256,13 +280,30 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
 
   win.on('focus', () => {
     const d = browserWindows.get(id)
-    if (d?.locked && !d.win.isDestroyed()) d.win.blur()
+    if (d?.locked && !d.win.isDestroyed()) {
+      d.win.blur()
+      return
+    }
+    if (process.platform !== 'darwin') {
+      lastActiveBrowserPerDisplay.set(d.displayId, id)
+      if (!win.isDestroyed()) win.moveTop()
+      if (controlWindow && !controlWindow.isDestroyed()) controlWindow.moveTop()
+    }
   })
   if (zoomFactor !== 1) win.webContents.setZoomFactor(zoomFactor)
 
-  if (alwaysOnTop && !hidden) {
-    if (process.platform === 'darwin') win.setAlwaysOnTop(true, 'floating')
-    else { win.setAlwaysOnTop(true); raiseControlWindow() }
+  if (process.platform === 'darwin') {
+    if (alwaysOnTop && !hidden) win.setAlwaysOnTop(true, 'floating')
+  } else {
+    // On Windows: browser windows are always TOPMOST — taskbar can never cover them.
+    // "Pinned" asserts order via moveTop(), never by toggling setAlwaysOnTop.
+    win.setAlwaysOnTop(true)
+    if (alwaysOnTop && !hidden) {
+      setTimeout(() => {
+        if (!win.isDestroyed()) win.moveTop()
+        if (controlWindow && !controlWindow.isDestroyed()) controlWindow.moveTop()
+      }, 50)
+    }
   }
 
   function updateNavState(newUrl) {
@@ -294,6 +335,9 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
 
   win.on('closed', () => {
     browserWindows.delete(id)
+    for (const [displayId, bid] of lastActiveBrowserPerDisplay.entries()) {
+      if (bid === id) lastActiveBrowserPerDisplay.delete(displayId)
+    }
     notifyControlWindow()
   })
 
@@ -449,7 +493,7 @@ ipcMain.handle('window:move', async (_, { id, displayId }) => {
       )
       if (conflictOnDest) {
         data.alwaysOnTop = false
-        data.win.setAlwaysOnTop(false)
+        if (process.platform === 'darwin') data.win.setAlwaysOnTop(false)
       }
     }
     data.displayId = displayId
@@ -460,20 +504,49 @@ ipcMain.handle('window:move', async (_, { id, displayId }) => {
 
   await exitFullscreen(data.win)
 
-  if (data.alwaysOnTop) {
-    const conflictOnDest = Array.from(browserWindows.values()).some(
-      d => d !== data && d.displayId === displayId && d.alwaysOnTop
-    )
-    if (conflictOnDest) {
-      data.alwaysOnTop = false
-      data.win.setAlwaysOnTop(false)
+  const sourceDisplayId = data.displayId
+  const destPinned = Array.from(browserWindows.values()).find(
+    d => d !== data && d.displayId === displayId && d.alwaysOnTop && !d.win.isDestroyed() && !d.hidden
+  )
+
+  // Scenario A: moving window is pinned but destination already has a pinned window — unpin it
+  if (data.alwaysOnTop && destPinned) {
+    data.alwaysOnTop = false
+    if (process.platform === 'darwin') data.win.setAlwaysOnTop(false)
+  }
+
+  if (process.platform !== 'darwin') {
+    // Assert z-order BEFORE setBounds so the window arrives already in the correct position.
+    if (data.alwaysOnTop) {
+      // Scenario B: moving window stays pinned — raise it to the top before the move
+      data.win.moveTop()
+    } else {
+      // Scenarios A, C, K: raise the authoritative window on the destination first so the
+      // arriving window is already behind it when setBounds lands it there
+      let toRaise = null
+      if (destPinned && !destPinned.win.isDestroyed() && !destPinned.hidden) {
+        toRaise = destPinned
+      } else {
+        const authId = lastActiveBrowserPerDisplay.get(displayId)
+        const tracked = authId ? browserWindows.get(authId) : null
+        toRaise = (tracked && !tracked.win.isDestroyed() && !tracked.hidden && tracked !== data)
+          ? tracked
+          : Array.from(browserWindows.values()).find(d => d !== data && d.displayId === displayId && !d.win.isDestroyed() && !d.hidden) || null
+      }
+      if (toRaise) toRaise.win.moveTop()
     }
   }
 
   data.win.setBounds(display.bounds)
   await enterFullscreen(data.win)
 
+  if (lastActiveBrowserPerDisplay.get(sourceDisplayId) === id) lastActiveBrowserPerDisplay.delete(sourceDisplayId)
   data.displayId = displayId
+
+  if (process.platform !== 'darwin') {
+    if (data.alwaysOnTop) lastActiveBrowserPerDisplay.set(displayId, id)
+    if (controlWindow && !controlWindow.isDestroyed()) controlWindow.moveTop()
+  }
 
   notifyControlWindow()
   saveState()
@@ -616,16 +689,25 @@ ipcMain.handle('window:alwaysOnTop', (_, { id, enabled }) => {
     for (const [otherId, otherData] of browserWindows.entries()) {
       if (otherId !== id && otherData.displayId === data.displayId && otherData.alwaysOnTop) {
         otherData.alwaysOnTop = false
-        if (!otherData.win.isDestroyed()) otherData.win.setAlwaysOnTop(false)
+        // macOS: un-float the window. Windows: leave TOPMOST, only update tracking state.
+        if (process.platform === 'darwin' && !otherData.win.isDestroyed()) otherData.win.setAlwaysOnTop(false)
       }
     }
   }
   data.alwaysOnTop = enabled
+  if (enabled && process.platform !== 'darwin') lastActiveBrowserPerDisplay.set(data.displayId, id)
   if (process.platform === 'darwin') {
     data.win.setAlwaysOnTop(enabled, 'floating')
   } else {
-    data.win.setAlwaysOnTop(enabled)
-    if (enabled) raiseControlWindow()
+    // On Windows: TOPMOST is permanent; pin/unpin only asserts order via moveTop().
+    if (enabled) {
+      const assertPin = () => {
+        if (!data.win.isDestroyed() && data.alwaysOnTop) data.win.moveTop()
+        if (controlWindow && !controlWindow.isDestroyed()) controlWindow.moveTop()
+      }
+      setTimeout(assertPin, 50)
+      setTimeout(assertPin, 250)
+    }
   }
   notifyControlWindow()
   saveState()
