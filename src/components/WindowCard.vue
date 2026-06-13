@@ -168,7 +168,20 @@
         <div class="wc-popover-backdrop" @click="openPopover = false"></div>
         <div class="wc-popover" :style="popoverStyle">
           <div class="wc-popover-row">
-            <div class="wc-popover-title">Auto-reload</div>
+            <div class="wc-autoreload-left">
+              <div class="wc-popover-title">Auto-reload</div>
+              <label class="wc-popover-interval" :class="{ 'wc-interval-inactive': !settings.autoReload }">
+                <input
+                  type="text"
+                  v-model="localIntervalText"
+                  class="wc-popover-duration"
+                  placeholder="0:30"
+                  :disabled="!settings.autoReload"
+                  @blur="onIntervalBlur"
+                  @keydown.enter="$event.target.blur()"
+                />
+              </label>
+            </div>
             <button
               class="wc-switch"
               :class="{ 'wc-switch-on': settings.autoReload }"
@@ -178,17 +191,6 @@
               :aria-checked="settings.autoReload"
             ><span class="wc-switch-thumb"></span></button>
           </div>
-          <label class="wc-popover-interval">
-            <span>Every</span>
-            <input
-              type="text"
-              v-model="localIntervalText"
-              class="wc-popover-duration"
-              placeholder="0:30"
-              @blur="onIntervalBlur"
-              @keydown.enter="$event.target.blur()"
-            />
-          </label>
           <div class="wc-popover-divider"></div>
           <div class="wc-popover-row">
             <div class="wc-popover-title">Zoom</div>
@@ -232,7 +234,7 @@
               </option>
             </select>
           </div>
-          <div class="wc-audio-caveat">Only affects &lt;audio&gt; and &lt;video&gt; elements — Web Audio API sources are not routed.</div>
+          <div class="wc-audio-caveat">HTML media elements only — Web Audio API unaffected.</div>
           <div class="wc-popover-divider"></div>
           <div class="wc-popover-row">
             <div class="wc-popover-title">Block browser interaction</div>
@@ -248,24 +250,26 @@
           <div class="wc-popover-divider"></div>
           <div class="wc-popover-row">
             <div class="wc-popover-title">Inject CSS</div>
+            <div class="wc-css-row-actions">
+              <button v-if="localCss" class="wc-css-btn wc-css-btn-clear" @click="clearCss">Clear</button>
+              <button v-if="localCss && localCss !== (win.customCSS || '')" class="wc-css-btn wc-css-btn-apply" @click="applyCSS">Apply</button>
+            </div>
             <button
               class="wc-switch"
-              :class="{ 'wc-switch-on': win.customCSS }"
+              :class="{ 'wc-switch-on': win.customCSS || showCssEditor }"
               @click="toggleCSSEnabled"
-              :title="win.customCSS ? 'Remove injected CSS' : 'Apply CSS'"
+              :title="win.customCSS || showCssEditor ? 'Disable CSS' : 'Enable CSS'"
               role="switch"
-              :aria-checked="!!win.customCSS"
+              :aria-checked="!!(win.customCSS || showCssEditor)"
             ><span class="wc-switch-thumb"></span></button>
           </div>
           <textarea
+            v-if="win.customCSS || localCss || showCssEditor"
             v-model="localCss"
             class="wc-css-textarea"
             spellcheck="false"
             placeholder="body { background: #000; }"
           ></textarea>
-          <div class="wc-popover-footer">
-            <button v-if="localCss" class="wc-popover-btn wc-popover-clear" @click="clearCss">Clear</button>
-          </div>
         </div>
       </template>
     </Teleport>
@@ -288,14 +292,14 @@
         @click="$emit('refresh')"
         class="action-btn"
         :class="{ 'action-btn-autoreload': settings.autoReload }"
-        :title="settings.autoReload ? 'Auto-reload active — click to reload now' : 'Refresh page'"
+        :title="settings.autoReload ? 'Auto-reload active — click to reload now' : 'Reload page'"
       >
         <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="23 4 23 10 17 10"></polyline>
           <polyline points="1 20 1 14 7 14"></polyline>
           <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
         </svg>
-        {{ settings.autoReload ? formatDuration(countdown) : 'Refresh' }}
+        {{ settings.autoReload ? formatDuration(countdown) : 'Reload' }}
       </button>
       <button @click="emitMove($event)" class="action-btn" title="Move to another screen">
         <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -513,6 +517,7 @@ export default {
     // ── Advanced: popovers ────────────────────────────────────────
     const openPopover = ref(false)
     const localCss = ref('')
+    const showCssEditor = ref(false)
     const localInterval = ref(30)
     const localIntervalText = ref('0:30')
     const cogBtnRef = ref(null)
@@ -558,7 +563,7 @@ export default {
           bottom: window.innerHeight - rect.top + 6,
           right: Math.max(20, window.innerWidth - rect.right),
           maxH: rect.top - 12,
-          maxW: rect.right - 20
+          maxW: Math.min(rect.right - 20, 360)
         }
       }
       if (!localCss.value && props.win.customCSS) localCss.value = props.win.customCSS
@@ -568,7 +573,17 @@ export default {
     }
 
     function toggleCSSEnabled() {
-      emit('apply-css', { css: props.win.customCSS ? '' : localCss.value })
+      if (props.win.customCSS || showCssEditor.value) {
+        showCssEditor.value = false
+        emit('apply-css', { css: '' })
+      } else {
+        showCssEditor.value = true
+        if (localCss.value) emit('apply-css', { css: localCss.value })
+      }
+    }
+
+    function applyCSS() {
+      emit('apply-css', { css: localCss.value })
     }
 
     function clearCss() {
@@ -595,7 +610,10 @@ export default {
 
     watch(openPopover, (val) => {
       if (val) document.addEventListener('keydown', onPopoverKeydown)
-      else document.removeEventListener('keydown', onPopoverKeydown)
+      else {
+        document.removeEventListener('keydown', onPopoverKeydown)
+        if (!props.win.customCSS && !localCss.value) showCssEditor.value = false
+      }
     })
 
     const countdown = ref(0)
@@ -658,8 +676,8 @@ export default {
     }
 
     return { editing, editUrl, urlInputRef, startEdit, confirmEdit, cancelEdit, onThumbnailClick, onThumbnailScroll, typing, typeBuffer, typeInputRef, onTypeKeydown,
-      openPopover, localCss, localInterval, localIntervalText, cogBtnRef, popoverStyle, countdown,
-      togglePopover, toggleCSSEnabled, clearCss, onIntervalBlur, toggleAutoReload, formatDuration,
+      openPopover, localCss, showCssEditor, localInterval, localIntervalText, cogBtnRef, popoverStyle, countdown,
+      togglePopover, toggleCSSEnabled, applyCSS, clearCss, onIntervalBlur, toggleAutoReload, formatDuration,
       labelInputRef, editingLabel, labelDraft, startLabelEdit, saveLabelEdit, cancelLabelEdit, resetLabelEdit,
       currentZoom, zoomIn, zoomOut, editingZoom, zoomDraft, zoomInputRef, startZoomEdit, confirmZoomEdit, cancelZoomEdit,
       emitMove }
@@ -1311,6 +1329,10 @@ export default {
   border-color: var(--accent);
 }
 
+.wc-popover-duration:disabled {
+  cursor: not-allowed;
+}
+
 .wc-switch {
   position: relative;
   width: 36px;
@@ -1352,7 +1374,6 @@ export default {
 
 .wc-css-textarea {
   width: 100%;
-  min-width: 240px;
   height: 110px;
   padding: 8px 10px;
   background: var(--bg-dark);
@@ -1377,32 +1398,45 @@ export default {
   opacity: 0.5;
 }
 
-.wc-popover-footer {
+.wc-css-row-actions {
   display: flex;
-  gap: 8px;
-  justify-content: flex-end;
+  gap: 5px;
+  margin-left: auto;
+  margin-right: 8px;
 }
 
-.wc-popover-btn {
-  padding: 6px 14px;
-  border-radius: 6px;
-  font-size: 13px;
+.wc-css-btn {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
   font-weight: 500;
   font-family: inherit;
+  line-height: 1;
   cursor: pointer;
-  transition: opacity 0.12s, background 0.12s, color 0.12s;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 
-.wc-popover-clear {
+.wc-css-btn-clear {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-secondary);
 }
 
-.wc-popover-clear:hover {
+.wc-css-btn-clear:hover {
   background: rgba(248, 81, 73, 0.1);
   border-color: rgba(248, 81, 73, 0.4);
   color: var(--danger);
+}
+
+.wc-css-btn-apply {
+  background: transparent;
+  border: 1px solid rgba(157, 119, 245, 0.3);
+  color: var(--accent);
+}
+
+.wc-css-btn-apply:hover {
+  background: rgba(157, 119, 245, 0.12);
+  border-color: rgba(157, 119, 245, 0.6);
 }
 
 .wc-audio-select-wrap {
@@ -1460,6 +1494,18 @@ export default {
   color: var(--text-secondary);
   opacity: 0.6;
   line-height: 1.4;
+}
+
+.wc-autoreload-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.wc-interval-inactive {
+  opacity: 0.4;
 }
 
 .wc-zoom-controls {
