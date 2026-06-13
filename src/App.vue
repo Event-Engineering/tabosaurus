@@ -6,23 +6,54 @@
           <input
             v-model="urlInput"
             @keyup.enter="openWindow"
-            @focus="showSuggestions = true"
+            @focus="e => { showSuggestions = true; suggestionQuery = ''; e.target.select() }"
             @blur="hideSuggestions"
             @keydown="handleSuggestionsKey"
-            @input="suggestionIndex = -1"
+            @input="suggestionIndex = -1; suggestionQuery = urlInput"
             placeholder="https://example.com"
             class="url-input"
+            :class="{ 'url-input-has-star': normalizedInput }"
             type="text"
             spellcheck="false"
           />
-          <ul v-if="showSuggestions && filteredRecentUrls.length" class="url-suggestions">
+          <button
+            v-if="normalizedInput"
+            class="url-star-btn"
+            :class="{ active: isFavourite(normalizedInput) }"
+            @mousedown.prevent="toggleFavourite(normalizedInput)"
+            :title="isFavourite(normalizedInput) ? 'Remove from favourites' : 'Add to favourites'"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon :fill="isFavourite(normalizedInput) ? 'currentColor' : 'none'" points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </button>
+          <ul v-if="showSuggestions && (filteredFavouriteUrls.length || filteredRecentUrls.length)" class="url-suggestions">
             <li
-              v-for="(url, i) in filteredRecentUrls"
-              :key="url"
+              v-for="(url, i) in filteredFavouriteUrls"
+              :key="'fav-' + url"
               :class="{ active: i === suggestionIndex }"
               @mousedown.prevent="selectSuggestion(url)"
             >
               <span class="suggestion-url">{{ url }}</span>
+              <button class="suggestion-star active" @mousedown.prevent.stop="toggleFavourite(url)" title="Remove from favourites">
+                <svg width="11" height="11" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon fill="currentColor" points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+              </button>
+            </li>
+            <li v-if="filteredFavouriteUrls.length && filteredRecentUrls.length" class="suggestion-divider" role="separator"></li>
+            <li
+              v-for="(url, i) in filteredRecentUrls"
+              :key="'hist-' + url"
+              :class="{ active: filteredFavouriteUrls.length + i === suggestionIndex }"
+              @mousedown.prevent="selectSuggestion(url)"
+            >
+              <span class="suggestion-url">{{ url }}</span>
+              <button class="suggestion-star" @mousedown.prevent.stop="toggleFavourite(url)" title="Add to favourites">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+              </button>
               <button class="suggestion-delete" @mousedown.prevent.stop="removeRecentUrl(url)" title="Remove from history">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -185,15 +216,34 @@ export default {
     const alwaysOnTop = ref(true)
     const interactiveWindowId = ref(null)
     const recentUrls = ref(JSON.parse(localStorage.getItem('recentUrls') || '[]'))
+    const favouriteUrls = ref(JSON.parse(localStorage.getItem('favouriteUrls') || '[]'))
     const showSuggestions = ref(false)
     const suggestionIndex = ref(-1)
     const appVersion = ref('')
 
-    const filteredRecentUrls = computed(() => {
-      const q = urlInput.value.trim().toLowerCase()
-      if (!q) return recentUrls.value
-      return recentUrls.value.filter(u => u.toLowerCase().includes(q))
+    const normalizedInput = computed(() => {
+      const url = urlInput.value.trim()
+      if (!url) return ''
+      return /^https?:\/\//i.test(url) ? url : 'https://' + url
     })
+
+    const suggestionQuery = ref('')
+
+    const filteredFavouriteUrls = computed(() => {
+      const q = suggestionQuery.value.trim().toLowerCase()
+      if (!q) return favouriteUrls.value
+      return favouriteUrls.value.filter(u => u.toLowerCase().includes(q))
+    })
+
+    const filteredRecentUrls = computed(() => {
+      const q = suggestionQuery.value.trim().toLowerCase()
+      const favSet = new Set(favouriteUrls.value)
+      const nonFav = recentUrls.value.filter(u => !favSet.has(u))
+      if (!q) return nonFav
+      return nonFav.filter(u => u.toLowerCase().includes(q))
+    })
+
+    const allSuggestions = computed(() => [...filteredFavouriteUrls.value, ...filteredRecentUrls.value])
     let thumbTimer = null
     let interactPollTimer = null
     let unsubscribe = null
@@ -448,7 +498,7 @@ export default {
     }
 
     function handleSuggestionsKey(e) {
-      const suggestions = filteredRecentUrls.value
+      const suggestions = allSuggestions.value
       if (!showSuggestions.value || !suggestions.length) return
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -457,6 +507,7 @@ export default {
         e.preventDefault()
         suggestionIndex.value = Math.max(suggestionIndex.value - 1, -1)
       } else if (e.key === 'Escape') {
+        urlInput.value = ''
         hideSuggestions()
       } else if (e.key === 'Enter' && suggestionIndex.value >= 0) {
         e.stopImmediatePropagation()
@@ -542,6 +593,17 @@ export default {
       const list = recentUrls.value.filter(u => u !== url)
       recentUrls.value = list
       localStorage.setItem('recentUrls', JSON.stringify(list))
+    }
+
+    function toggleFavourite(url) {
+      if (!/^https?:\/\//i.test(url)) url = 'https://' + url
+      const list = favouriteUrls.value
+      favouriteUrls.value = list.includes(url) ? list.filter(u => u !== url) : [url, ...list]
+      localStorage.setItem('favouriteUrls', JSON.stringify(favouriteUrls.value))
+    }
+
+    function isFavourite(url) {
+      return favouriteUrls.value.includes(url)
     }
 
     async function init() {
@@ -750,8 +812,8 @@ export default {
 
     return {
       urlInput, displays, labelledDisplays, selectedDisplayId, selectedDisplay, windows, thumbnails, movingWindow, moveAnchor, showDisplayPicker, displayPickerAnchor, alwaysOnTop, interactiveWindowId,
-      recentUrls, filteredRecentUrls, showSuggestions, suggestionIndex, appVersion,
-      hideSuggestions, selectSuggestion, handleSuggestionsKey, removeRecentUrl,
+      recentUrls, filteredRecentUrls, filteredFavouriteUrls, normalizedInput, showSuggestions, suggestionQuery, suggestionIndex, appVersion,
+      hideSuggestions, selectSuggestion, handleSuggestionsKey, removeRecentUrl, toggleFavourite, isFavourite,
       mainRef, gridStyle, oversized, trimLayout, isMaximized,
       windowSettings, reloadCycleStarts,
       displayById, openWindow, resetLayout, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
@@ -855,6 +917,44 @@ export default {
   color: var(--danger);
 }
 
+.suggestion-star {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  opacity: 0;
+  transition: opacity 0.1s, color 0.1s;
+}
+
+.suggestion-star.active {
+  color: #f5c518;
+  opacity: 1;
+}
+
+.url-suggestions li:hover .suggestion-star,
+.url-suggestions li.active .suggestion-star {
+  opacity: 1;
+}
+
+.suggestion-star:hover {
+  color: #f5c518;
+}
+
+.url-suggestions li.suggestion-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 12px;
+  padding: 0;
+  min-height: unset;
+  pointer-events: none;
+  cursor: default;
+}
+
 .url-input {
   width: 100%;
   height: 35px;
@@ -867,6 +967,32 @@ export default {
   font-size: 13px;
   outline: none;
   transition: border-color 0.15s;
+}
+
+.url-input.url-input-has-star {
+  padding-right: 32px;
+}
+
+.url-star-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.url-star-btn:hover,
+.url-star-btn.active {
+  color: #f5c518;
 }
 
 .url-input:focus {
