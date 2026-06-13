@@ -118,6 +118,7 @@ function buildWindowList() {
     canGoBack: data.canGoBack,
     canGoForward: data.canGoForward,
     alwaysOnTop: data.alwaysOnTop,
+    locked: data.locked,
     customCSS: data.customCSS,
     zoomFactor: data.zoomFactor,
     muted: data.muted,
@@ -198,6 +199,7 @@ function saveState() {
       url: d.url,
       displayId: d.displayId,
       alwaysOnTop: d.alwaysOnTop,
+      locked: d.locked,
       customCSS: d.customCSS,
       zoomFactor: d.zoomFactor,
       audioOutputDeviceId: d.audioOutputDeviceId
@@ -220,7 +222,7 @@ function loadState() {
 
 // ── Window factory ────────────────────────────────────────────
 
-function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false, customCSS = '', zoomFactor = 1, audioOutputDeviceId = '' } = {}) {
+function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false, locked = false, customCSS = '', zoomFactor = 1, audioOutputDeviceId = '' } = {}) {
   const allDisplays = screen.getAllDisplays()
   const display = allDisplays.find(d => d.id === displayId) || screen.getPrimaryDisplay()
 
@@ -248,7 +250,14 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
   }
 
   const id = nextId++
-  browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden, alwaysOnTop, customCSS, cssKey: null, canGoBack: false, canGoForward: false, zoomFactor, muted: false, audioOutputDeviceId })
+  browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden, alwaysOnTop, locked, customCSS, cssKey: null, canGoBack: false, canGoForward: false, zoomFactor, muted: false, audioOutputDeviceId })
+
+  if (locked) win.setIgnoreMouseEvents(true)
+
+  win.on('focus', () => {
+    const d = browserWindows.get(id)
+    if (d?.locked && !d.win.isDestroyed()) d.win.blur()
+  })
   if (zoomFactor !== 1) win.webContents.setZoomFactor(zoomFactor)
 
   if (alwaysOnTop && !hidden) {
@@ -323,9 +332,9 @@ function restoreWindows() {
 
   const currentDisplayIds = new Set(screen.getAllDisplays().map(d => d.id))
 
-  for (const { url, displayId, alwaysOnTop, customCSS, zoomFactor, audioOutputDeviceId } of state.windows) {
+  for (const { url, displayId, alwaysOnTop, locked, customCSS, zoomFactor, audioOutputDeviceId } of state.windows) {
     const hidden = !currentDisplayIds.has(displayId)
-    openBrowserWindow(url, displayId, { hidden, alwaysOnTop: !hidden && !!alwaysOnTop, customCSS: customCSS || '', zoomFactor: zoomFactor || 1, audioOutputDeviceId: audioOutputDeviceId || '' })
+    openBrowserWindow(url, displayId, { hidden, alwaysOnTop: !hidden && !!alwaysOnTop, locked: !!locked, customCSS: customCSS || '', zoomFactor: zoomFactor || 1, audioOutputDeviceId: audioOutputDeviceId || '' })
   }
 
   notifyControlWindow()
@@ -618,6 +627,16 @@ ipcMain.handle('window:alwaysOnTop', (_, { id, enabled }) => {
     data.win.setAlwaysOnTop(enabled)
     if (enabled) raiseControlWindow()
   }
+  notifyControlWindow()
+  saveState()
+})
+
+ipcMain.handle('window:setLocked', (_, { id, locked }) => {
+  const data = browserWindows.get(id)
+  if (!data || data.win.isDestroyed()) return
+  data.locked = locked
+  data.win.setIgnoreMouseEvents(locked)
+  if (locked && data.win.isFocused()) data.win.blur()
   notifyControlWindow()
   saveState()
 })

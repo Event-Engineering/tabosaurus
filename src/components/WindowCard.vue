@@ -235,6 +235,18 @@
           <div class="wc-audio-caveat">Only affects &lt;audio&gt; and &lt;video&gt; elements — Web Audio API sources are not routed.</div>
           <div class="wc-popover-divider"></div>
           <div class="wc-popover-row">
+            <div class="wc-popover-title">Block browser interaction</div>
+            <button
+              class="wc-switch"
+              :class="{ 'wc-switch-on': win.locked }"
+              @click="$emit('set-locked', !win.locked)"
+              :title="win.locked ? 'Allow direct interaction with browser window' : 'Block direct interaction — thumbnail only'"
+              role="switch"
+              :aria-checked="!!win.locked"
+            ><span class="wc-switch-thumb"></span></button>
+          </div>
+          <div class="wc-popover-divider"></div>
+          <div class="wc-popover-row">
             <div class="wc-popover-title">Inject CSS</div>
             <button
               class="wc-switch"
@@ -327,7 +339,7 @@
         ref="cogBtnRef"
         @click="togglePopover()"
         class="action-btn action-btn-close"
-        :class="{ 'action-btn-cog-active': settings.autoReload || win.customCSS || (win.zoomFactor && win.zoomFactor !== 1) || win.audioOutputDeviceId || win.muted }"
+        :class="{ 'action-btn-cog-active': settings.autoReload || win.customCSS || (win.zoomFactor && win.zoomFactor !== 1) || win.audioOutputDeviceId || win.muted || win.locked }"
         title="Advanced settings"
       >
         <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -359,7 +371,7 @@ export default {
     settings: { type: Object, default: () => ({ autoReload: false, reloadInterval: 30 }) },
     audioOutputDevices: { type: Array, default: () => [] }
   },
-  emits: ['refresh', 'move', 'close', 'navigate', 'back', 'forward', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key', 'toggle-interactive', 'pin', 'set-reload', 'apply-css', 'rename-display', 'set-zoom', 'set-muted', 'set-audio-output'],
+  emits: ['refresh', 'move', 'close', 'navigate', 'back', 'forward', 'blackout', 'visibility', 'interact-click', 'interact-scroll', 'interact-key', 'toggle-interactive', 'pin', 'set-reload', 'apply-css', 'rename-display', 'set-zoom', 'set-muted', 'set-audio-output', 'set-locked'],
   setup(props, { emit }) {
     const editing = ref(false)
     const editUrl = ref('')

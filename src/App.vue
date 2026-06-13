@@ -163,6 +163,7 @@
           @rename-display="handleRenameDisplay"
           @set-zoom="(factor) => handleSetZoom(win.id, factor)"
           @set-muted="(muted) => handleSetMuted(win.id, muted)"
+          @set-locked="(locked) => handleSetLocked(win.id, locked)"
           :audioOutputDevices="audioOutputDevices"
           @set-audio-output="(deviceId) => handleSetAudioOutput(win.id, deviceId)"
         />
@@ -566,6 +567,10 @@ export default {
       await window.api.setMuted(id, muted)
     }
 
+    async function handleSetLocked(id, locked) {
+      await window.api.setWindowLocked(id, locked)
+    }
+
     async function handleSetAudioOutput(id, deviceId) {
       await window.api.setAudioOutput(id, deviceId)
     }
@@ -818,7 +823,7 @@ export default {
       windowSettings, reloadCycleStarts,
       displayById, openWindow, resetLayout, refreshWindow, closeWindow, navigateWindow, goBack, goForward, blackoutWindow,
       setWindowVisibility, toggleAlwaysOnTop, startMove, openDisplayPicker, doMove, selectDisplay, toggleInteractive, interactClick, interactScroll, interactKey,
-      handlePin, handleSetReload, handleApplyCss, handleRenameDisplay, handleSetZoom, handleSetMuted, handleSetAudioOutput,
+      handlePin, handleSetReload, handleApplyCss, handleRenameDisplay, handleSetZoom, handleSetMuted, handleSetAudioOutput, handleSetLocked,
       audioOutputDevices
     }
   }
