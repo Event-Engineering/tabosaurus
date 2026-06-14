@@ -195,8 +195,15 @@
           <div class="wc-popover-row">
             <div class="wc-popover-title">Zoom</div>
             <div class="wc-zoom-controls">
-              <button class="wc-zoom-btn wc-zoom-reset" :style="{ visibility: currentZoom !== 1 ? 'visible' : 'hidden' }" @click="$emit('set-zoom', 1)" title="Reset to 100%">↺</button>
-              <button class="wc-zoom-btn" @click="zoomOut" :disabled="currentZoom <= 0.1">−</button>
+              <button class="wc-zoom-btn wc-zoom-reset" :style="{ visibility: currentZoom !== 1 ? 'visible' : 'hidden' }" @click="$emit('set-zoom', 1)" title="Reset to 100%">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                  <path d="M3 3v5h5"/>
+                </svg>
+              </button>
+              <button class="wc-zoom-btn" @click="zoomOut" :disabled="currentZoom <= 0.1">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="1" y1="5" x2="9" y2="5"/></svg>
+              </button>
               <input
                 v-if="editingZoom"
                 ref="zoomInputRef"
@@ -207,7 +214,9 @@
                 @keydown.escape.prevent="cancelZoomEdit"
               />
               <span v-else class="wc-zoom-value" @click="startZoomEdit">{{ Math.round(currentZoom * 100) }}%</span>
-              <button class="wc-zoom-btn" @click="zoomIn" :disabled="currentZoom >= 5">+</button>
+              <button class="wc-zoom-btn" @click="zoomIn" :disabled="currentZoom >= 5">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="5" y1="1" x2="5" y2="9"/><line x1="1" y1="5" x2="9" y2="5"/></svg>
+              </button>
             </div>
           </div>
           <div class="wc-popover-divider"></div>
@@ -1521,14 +1530,12 @@ export default {
   background: var(--bg-dark);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  font-size: 15px;
-  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: background 0.12s;
-  font-family: inherit;
+  padding: 0;
 }
 
 .wc-zoom-btn:hover:not(:disabled) {
