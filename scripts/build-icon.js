@@ -4,14 +4,16 @@ const fs = require('fs')
 const path = require('path')
 
 const BUILD = path.join(__dirname, '..', 'build')
-const svg = fs.readFileSync(path.join(BUILD, 'icon.svg'))
+const svgPath = path.join(BUILD, 'icon.svg')
+const srcPath = path.join(BUILD, 'icon-source.png')
+const source = fs.existsSync(svgPath) ? fs.readFileSync(svgPath) : srcPath
 
 async function main() {
   const sizes = [16, 32, 48, 128, 256, 512, 1024]
   const pngs = {}
 
   for (const s of sizes) {
-    pngs[s] = await sharp(svg).resize(s, s).png().toBuffer()
+    pngs[s] = await sharp(source).resize(s, s).png().toBuffer()
   }
 
   fs.writeFileSync(path.join(BUILD, 'icon.png'), pngs[1024])
