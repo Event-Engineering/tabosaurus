@@ -26,8 +26,13 @@ An Electron app for opening and controlling fullscreen browser windows across mu
 - ⬛ Blackout / hide individual windows (for when the presenter walks away and leaves slides on screen)
 - ↔️ Move windows between displays without breaking a sweat
 - ⬅️ Back / forward navigation per window
-- 📌 Always-on-top control panel, because it knows it's more important than whatever you were doing
-- 🕑 URL history autocomplete — recently opened URLs suggested as you type
+- 📌 Pin windows always-on-top per display
+- 🔁 Auto-reload on a configurable interval
+- 🔎 Per-window zoom control
+- 🎨 Inject custom CSS into any window, with a pop-out editor
+- 🔊 Route audio output per window to any available device
+- ⭐ URL favourites with autocomplete history
+- 🏷️ Editable display labels
 - 💾 State persistence — windows reopen on next launch, whether you wanted them to or not
 
 ---
@@ -49,6 +54,16 @@ npm run package:win   # Windows NSIS installer (x64)
 ```
 
 Output lands in `release/`. Signing is optional — unsigned builds work fine for internal use.
+
+## Icon
+
+To regenerate the app icon from source:
+
+```bash
+npm run build:icon
+```
+
+Place your source image at `build/icon-source.png` (or `build/icon.svg` for vector). Outputs `icon.ico`, `icon.icns`, and `icon.png`.
 
 ## Releases
 
