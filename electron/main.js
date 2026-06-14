@@ -6,6 +6,7 @@ let controlWindow = null
 const browserWindows = new Map() // id -> { win, url, displayId, blackout, hidden }
 const lastActiveBrowserPerDisplay = new Map() // displayId -> browser window id
 let nextId = 1
+const iconExt = process.platform === 'darwin' ? 'icns' : process.platform === 'win32' ? 'ico' : 'png'
 
 // ── Control window ────────────────────────────────────────────
 
@@ -16,7 +17,6 @@ function debouncedSaveState() {
 }
 
 function createControlWindow() {
-  const iconExt = process.platform === 'darwin' ? 'icns' : process.platform === 'win32' ? 'ico' : 'png'
   const savedBounds = loadState()?.controlBounds
   controlWindow = new BrowserWindow({
     width: savedBounds?.width || 960,
@@ -262,6 +262,7 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
     frame: false,
     show: !hidden,
     backgroundColor: '#0d1117',
+    icon: path.join(__dirname, `../build/icon.${iconExt}`),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
