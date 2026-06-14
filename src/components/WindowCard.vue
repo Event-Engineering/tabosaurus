@@ -41,6 +41,11 @@
         <span class="type-hint">Esc to stop</span>
       </div>
 
+      <!-- Loading bar -->
+      <div v-if="win.isLoading" class="thumbnail-loading-bar">
+        <div class="thumbnail-loading-bar-inner"></div>
+      </div>
+
       <!-- Pin badge -->
       <button
         class="pin-badge"
@@ -904,6 +909,30 @@ export default {
   border-radius: 4px;
   pointer-events: none;
   backdrop-filter: blur(4px);
+}
+
+.thumbnail-loading-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  z-index: 10;
+  overflow: hidden;
+  background: rgba(157, 119, 245, 0.25);
+}
+
+.thumbnail-loading-bar-inner {
+  height: 100%;
+  width: 45%;
+  background: var(--accent);
+  animation: loading-slide 1.2s ease-in-out infinite;
+  box-shadow: 0 0 10px 3px rgba(157, 119, 245, 0.8);
+}
+
+@keyframes loading-slide {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
 }
 
 .thumbnail-badges {

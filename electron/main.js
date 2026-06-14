@@ -149,7 +149,8 @@ function buildWindowList() {
     customCSS: data.customCSS,
     zoomFactor: data.zoomFactor,
     muted: data.muted,
-    audioOutputDeviceId: data.audioOutputDeviceId
+    audioOutputDeviceId: data.audioOutputDeviceId,
+    isLoading: data.isLoading
   }))
 }
 
@@ -275,7 +276,7 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
   }
 
   const id = nextId++
-  browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden, alwaysOnTop, locked, customCSS, cssKey: null, canGoBack: false, canGoForward: false, zoomFactor, muted: false, audioOutputDeviceId })
+  browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden, alwaysOnTop, locked, customCSS, cssKey: null, canGoBack: false, canGoForward: false, zoomFactor, muted: false, audioOutputDeviceId, isLoading: false })
 
   if (locked) win.setIgnoreMouseEvents(true)
 
@@ -319,10 +320,19 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
   win.webContents.on('did-navigate', (_, newUrl) => updateNavState(newUrl))
   win.webContents.on('did-navigate-in-page', (_, newUrl) => updateNavState(newUrl))
 
+  win.webContents.on('did-start-loading', () => {
+    const data = browserWindows.get(id)
+    if (!data) return
+    data.isLoading = true
+    notifyControlWindow()
+  })
+
   win.webContents.on('dom-ready', async () => {
     if (win.isDestroyed()) return
     const data = browserWindows.get(id)
     if (!data) return
+    data.isLoading = false
+    notifyControlWindow()
     data.cssKey = null
     await win.webContents.insertCSS(HIDE_SCROLLBARS_CSS).catch(() => {})
     if (data.customCSS) {
