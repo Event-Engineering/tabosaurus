@@ -22,8 +22,8 @@ An Electron app for opening and controlling fullscreen browser windows across mu
 
 - 🖥️ Open fullscreen browser windows on any connected display
 - 🔍 Live thumbnail previews so you know what chaos is happening on the other screens
-- 🖱️ **Interactive mode** — click, scroll, and type directly via the thumbnail, like a tiny remote control for a browser that didn't ask to be remote-controlled
-- ⬛ Blackout / hide individual windows (for when the presenter walks away and leaves slides on screen)
+- 🖱️ **Interactive mode** — click, scroll and type directly via the thumbnail, like a tiny remote control
+- ⬛ Blackout / hide individual windows
 - ↔️ Move windows between displays without breaking a sweat
 - ⬅️ Back / forward navigation per window
 - 📌 Pin windows always-on-top per display
