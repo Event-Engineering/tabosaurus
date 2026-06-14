@@ -59,6 +59,25 @@
         <span class="interactive-dot"></span>Live
       </div>
 
+      <!-- Status badges -->
+      <div v-if="!interactive && ((win.zoomFactor && win.zoomFactor !== 1) || win.muted || win.audioOutputDeviceId || win.locked || win.customCSS)" class="thumbnail-badges">
+        <div v-if="win.zoomFactor && win.zoomFactor !== 1" class="thumb-badge thumb-badge-icon thumb-badge-zoom" :title="`Zoom: ${Math.round(win.zoomFactor * 100)}%`">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <div v-if="win.muted" class="thumb-badge thumb-badge-icon thumb-badge-muted" title="Audio muted">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+        </div>
+        <div v-if="win.audioOutputDeviceId" class="thumb-badge thumb-badge-icon thumb-badge-audio" title="Audio routed to non-default device">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+        </div>
+        <div v-if="win.locked" class="thumb-badge thumb-badge-icon thumb-badge-locked" title="Browser window interaction blocked">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div v-if="win.customCSS" class="thumb-badge thumb-badge-icon thumb-badge-css" title="Custom CSS injected">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </div>
+      </div>
+
       <!-- Hidden overlay on thumbnail -->
       <Transition name="hidden-overlay">
         <div v-if="win.hidden" class="hidden-overlay">
@@ -886,6 +905,56 @@ export default {
   pointer-events: none;
   backdrop-filter: blur(4px);
 }
+
+.thumbnail-badges {
+  position: absolute;
+  bottom: clamp(4px, 1.5cqw, 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: min(0.8cqw, 5px);
+  pointer-events: none;
+}
+
+.thumb-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  pointer-events: auto;
+}
+
+.thumb-badge svg {
+  width: clamp(8px, 2cqw, 12px);
+  height: clamp(8px, 2cqw, 12px);
+  flex-shrink: 0;
+  display: block;
+}
+
+.thumb-badge-icon {
+  width: clamp(16px, 4.5cqw, 26px);
+  height: clamp(16px, 4.5cqw, 26px);
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.thumb-badge-pill {
+  gap: min(0.6cqw, 4px);
+  height: clamp(16px, 4.5cqw, 26px);
+  padding: 0 min(1.4cqw, 9px);
+  border-radius: 100px;
+  font-size: clamp(8px, 1.8cqw, 11px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.thumb-badge-css    { background: rgba(157, 119, 245, 0.75); box-shadow: 0 0 10px 3px rgba(157, 119, 245, 0.5); }
+.thumb-badge-zoom   { background: rgba(88, 166, 255, 0.75);  box-shadow: 0 0 10px 3px rgba(88, 166, 255, 0.5); }
+.thumb-badge-muted  { background: rgba(248, 81, 73, 0.75);   box-shadow: 0 0 10px 3px rgba(248, 81, 73, 0.5); }
+.thumb-badge-audio  { background: rgba(240, 136, 62, 0.75);  box-shadow: 0 0 10px 3px rgba(240, 136, 62, 0.5); }
+.thumb-badge-locked { background: rgba(227, 179, 65, 0.75);  box-shadow: 0 0 10px 3px rgba(227, 179, 65, 0.5); }
 
 .interactive-dot {
   width: clamp(5px, 1.5cqw, 8px);
