@@ -318,7 +318,7 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
   win.webContents.on('did-navigate', (_, newUrl) => updateNavState(newUrl))
   win.webContents.on('did-navigate-in-page', (_, newUrl) => updateNavState(newUrl))
 
-  win.webContents.on('did-finish-load', async () => {
+  win.webContents.on('dom-ready', async () => {
     if (win.isDestroyed()) return
     const data = browserWindows.get(id)
     if (!data) return

@@ -261,7 +261,18 @@
             <div class="wc-popover-title">Inject CSS</div>
             <div class="wc-css-row-actions">
               <button v-if="localCss" class="wc-css-btn wc-css-btn-clear" @click="clearCss">Clear</button>
-              <button v-if="localCss && localCss !== (win.customCSS || '')" class="wc-css-btn wc-css-btn-apply" @click="applyCSS">Apply</button>
+              <button v-if="cssApplied || (localCss && localCss !== (win.customCSS || ''))" class="wc-css-btn wc-css-btn-apply" :class="{ 'wc-css-btn-applied': cssApplied }" @click="applyCSS">
+                <svg v-if="cssApplied" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                {{ cssApplied ? 'Applied' : 'Apply' }}
+              </button>
+              <button v-if="win.customCSS || localCss || showCssEditor" class="wc-css-expand-btn" @click="openCssModal = true" title="Open in larger editor">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <polyline points="9 21 3 21 3 15"></polyline>
+                  <line x1="21" y1="3" x2="14" y2="10"></line>
+                  <line x1="3" y1="21" x2="10" y2="14"></line>
+                </svg>
+              </button>
             </div>
             <button
               class="wc-switch"
@@ -279,6 +290,37 @@
             spellcheck="false"
             placeholder="body { background: #000; }"
           ></textarea>
+        </div>
+      </template>
+    </Teleport>
+
+    <!-- CSS modal -->
+    <Teleport to="body">
+      <template v-if="openCssModal">
+        <div class="wc-css-modal-backdrop" @click="openCssModal = false"></div>
+        <div class="wc-css-modal">
+          <div class="wc-css-modal-header">
+            <div class="wc-css-modal-title">Inject CSS</div>
+            <div class="wc-css-modal-url">{{ win.url }}</div>
+            <button class="wc-css-modal-close" @click="openCssModal = false" title="Close">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          <textarea
+            v-model="localCss"
+            class="wc-css-modal-textarea"
+            spellcheck="false"
+            placeholder="body { background: #000; }"
+          ></textarea>
+          <div class="wc-css-modal-footer">
+            <button class="wc-css-btn wc-css-btn-clear" @click="clearCss">Clear</button>
+            <button class="wc-css-btn wc-css-btn-apply" :class="{ 'wc-css-btn-applied': cssApplied }" @click="applyCSS">
+              <svg v-if="cssApplied" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              {{ cssApplied ? 'Applied' : 'Apply' }}
+            </button>
+          </div>
         </div>
       </template>
     </Teleport>
@@ -527,6 +569,7 @@ export default {
     const openPopover = ref(false)
     const localCss = ref('')
     const showCssEditor = ref(false)
+    const openCssModal = ref(false)
     const localInterval = ref(30)
     const localIntervalText = ref('0:30')
     const cogBtnRef = ref(null)
@@ -591,8 +634,14 @@ export default {
       }
     }
 
+    const cssApplied = ref(false)
+    let cssAppliedTimer = null
+
     function applyCSS() {
       emit('apply-css', { css: localCss.value })
+      if (cssAppliedTimer) clearTimeout(cssAppliedTimer)
+      cssApplied.value = true
+      cssAppliedTimer = setTimeout(() => { cssApplied.value = false }, 1500)
     }
 
     function clearCss() {
@@ -614,7 +663,12 @@ export default {
     }
 
     function onPopoverKeydown(e) {
+      if (openCssModal.value) return
       if (e.key === 'Escape') { openPopover.value = false; e.preventDefault(); e.stopPropagation() }
+    }
+
+    function onModalKeydown(e) {
+      if (e.key === 'Escape') { openCssModal.value = false; e.preventDefault(); e.stopPropagation() }
     }
 
     watch(openPopover, (val) => {
@@ -623,6 +677,11 @@ export default {
         document.removeEventListener('keydown', onPopoverKeydown)
         if (!props.win.customCSS && !localCss.value) showCssEditor.value = false
       }
+    })
+
+    watch(openCssModal, (val) => {
+      if (val) document.addEventListener('keydown', onModalKeydown)
+      else document.removeEventListener('keydown', onModalKeydown)
     })
 
     const countdown = ref(0)
@@ -685,8 +744,8 @@ export default {
     }
 
     return { editing, editUrl, urlInputRef, startEdit, confirmEdit, cancelEdit, onThumbnailClick, onThumbnailScroll, typing, typeBuffer, typeInputRef, onTypeKeydown,
-      openPopover, localCss, showCssEditor, localInterval, localIntervalText, cogBtnRef, popoverStyle, countdown,
-      togglePopover, toggleCSSEnabled, applyCSS, clearCss, onIntervalBlur, toggleAutoReload, formatDuration,
+      openPopover, localCss, showCssEditor, openCssModal, localInterval, localIntervalText, cogBtnRef, popoverStyle, countdown,
+      togglePopover, toggleCSSEnabled, applyCSS, cssApplied, clearCss, onIntervalBlur, toggleAutoReload, formatDuration,
       labelInputRef, editingLabel, labelDraft, startLabelEdit, saveLabelEdit, cancelLabelEdit, resetLabelEdit,
       currentZoom, zoomIn, zoomOut, editingZoom, zoomDraft, zoomInputRef, startZoomEdit, confirmZoomEdit, cancelZoomEdit,
       emitMove }
@@ -1448,6 +1507,16 @@ export default {
   border-color: rgba(157, 119, 245, 0.6);
 }
 
+.wc-css-btn-apply.wc-css-btn-applied,
+.wc-css-btn-apply.wc-css-btn-applied:hover {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(63, 185, 80, 0.1);
+  border-color: rgba(63, 185, 80, 0.4);
+  color: #3fb950;
+}
+
 .wc-audio-select-wrap {
   position: relative;
 }
@@ -1581,4 +1650,126 @@ export default {
   outline: none;
   padding: 0 2px;
 }
+
+.wc-css-expand-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.wc-css-expand-btn:hover {
+  background: rgba(157, 119, 245, 0.08);
+  border-color: rgba(157, 119, 245, 0.4);
+  color: var(--accent);
+}
+
+.wc-css-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 2000;
+}
+
+.wc-css-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2001;
+  display: flex;
+  flex-direction: column;
+  width: min(640px, calc(100vw - 48px));
+  height: min(520px, calc(100vh - 80px));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.wc-css-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.wc-css-modal-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.wc-css-modal-url {
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.wc-css-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.wc-css-modal-close:hover {
+  background: rgba(248, 81, 73, 0.1);
+  border-color: rgba(248, 81, 73, 0.3);
+  color: var(--danger);
+}
+
+.wc-css-modal-textarea {
+  flex: 1;
+  resize: none;
+  padding: 12px 14px;
+  background: var(--bg-dark);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: 'Menlo', 'Consolas', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  outline: none;
+}
+.wc-css-modal-textarea::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.5;
+}
+
+.wc-css-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  flex-shrink: 0;
+}
+
 </style>
