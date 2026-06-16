@@ -231,6 +231,7 @@ function saveState() {
       locked: d.locked,
       customCSS: d.customCSS,
       zoomFactor: d.zoomFactor,
+      muted: d.muted,
       audioOutputDeviceId: d.audioOutputDeviceId
     }))
   }
@@ -251,7 +252,7 @@ function loadState() {
 
 // ── Window factory ────────────────────────────────────────────
 
-function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false, locked = false, customCSS = '', zoomFactor = 1, audioOutputDeviceId = '' } = {}) {
+function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false, locked = false, customCSS = '', zoomFactor = 1, muted = false, audioOutputDeviceId = '' } = {}) {
   const allDisplays = screen.getAllDisplays()
   const display = allDisplays.find(d => d.id === displayId) || screen.getPrimaryDisplay()
 
@@ -276,7 +277,7 @@ function openBrowserWindow(url, displayId, { hidden = false, alwaysOnTop = false
   }
 
   const id = nextId++
-  browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden, alwaysOnTop, locked, customCSS, cssKey: null, canGoBack: false, canGoForward: false, zoomFactor, muted: false, audioOutputDeviceId, isLoading: false })
+  browserWindows.set(id, { win, url, displayId: display.id, blackout: false, hidden, alwaysOnTop, locked, customCSS, cssKey: null, canGoBack: false, canGoForward: false, zoomFactor, muted, audioOutputDeviceId, isLoading: false })
 
   if (locked) win.setIgnoreMouseEvents(true)
 
@@ -387,9 +388,9 @@ function restoreWindows() {
 
   const currentDisplayIds = new Set(screen.getAllDisplays().map(d => d.id))
 
-  for (const { url, displayId, alwaysOnTop, locked, customCSS, zoomFactor, audioOutputDeviceId } of state.windows) {
+  for (const { url, displayId, alwaysOnTop, locked, customCSS, zoomFactor, muted, audioOutputDeviceId } of state.windows) {
     const hidden = !currentDisplayIds.has(displayId)
-    openBrowserWindow(url, displayId, { hidden, alwaysOnTop: !hidden && !!alwaysOnTop, locked: !!locked, customCSS: customCSS || '', zoomFactor: zoomFactor || 1, audioOutputDeviceId: audioOutputDeviceId || '' })
+    openBrowserWindow(url, displayId, { hidden, alwaysOnTop: !hidden && !!alwaysOnTop, locked: !!locked, customCSS: customCSS || '', zoomFactor: zoomFactor || 1, muted: !!muted, audioOutputDeviceId: audioOutputDeviceId || '' })
   }
 
   notifyControlWindow()
@@ -764,6 +765,7 @@ ipcMain.handle('window:setMuted', (_, { id, muted }) => {
   data.muted = muted
   data.win.webContents.setAudioMuted(muted)
   notifyControlWindow()
+  saveState()
 })
 
 ipcMain.handle('window:setAudioOutput', async (_, { id, deviceId }) => {
@@ -802,7 +804,17 @@ app.whenReady().then(() => {
     if (permission === 'speaker-selection') return true
     return null
   })
-  Menu.setApplicationMenu(null)
+  if (process.platform === 'darwin') {
+    // macOS: a null menu also strips the standard Edit menu, which is what wires up
+    // Cmd+C/V/X/A in text fields, plus Cmd+Q to quit. Keep a minimal role-based menu.
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { role: 'appMenu' },
+      { role: 'editMenu' },
+      { role: 'windowMenu' }
+    ]))
+  } else {
+    Menu.setApplicationMenu(null)
+  }
   createControlWindow()
   restoreWindows()
   screen.on('display-added', notifyDisplaysUpdated)
