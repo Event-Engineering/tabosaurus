@@ -89,7 +89,91 @@ it has three regimes because the card's controls scale with container-query unit
 breakpoints and the `C_*` / `K_*` constants derived from `WindowCard.vue`'s CSS. If you change card
 CSS (padding, icon sizes, border), these constants must be re-derived or the window will size wrong.
 
-**Column count:**
+### Derivation
+
+The card has `border: 1px solid` with `box-sizing: border-box`, so content width is `cardW - 2` and
+container queries resolve as `cqw = (cardW - 2) / 100`.
+
+```
+card_h      = thumbnail_h + body_h + 2          (2 = card borders)
+thumbnail_h = aspect x (cardW - 2)              (thumbnail fills card content width)
+body_h      = card-body + card-actions
+```
+
+Reading the two body sections straight off `WindowCard.vue`'s CSS:
+
+- **card-body** — `padding: min(1.5cqw, 10px) min(2.5cqw, 16px)`, content is the url-row whose
+  height is set by the icon button at `clamp(17px, 4.2cqw, 24px)`.
+- **card-actions** — `border-top: 1px`, `padding: min(1.5cqw, 10px)`, content is the action-button
+  svg at `1.3em` where `em = clamp(10px, 2.5cqw, 14px)`.
+
+```
+body_h = 4 x min(1.5cqw, 10) + clamp(17, 4.2cqw, 24) + 1.3 x clamp(10, 2.5cqw, 14) + 1
+```
+
+Each `min`/`clamp` caps at a different width, which is where the three regimes come from:
+
+| Cap | Reached at | Width |
+|---|---|---|
+| Font | `cqw = 14 / 2.5 = 5.6` | ~562px |
+| Icons | `cqw = 24 / 4.2 = 5.714` | **~573px** (`W_ICONS_CAP`) |
+| Padding | `cqw = 10 / 1.5 = 6.667` | **~669px** (`W_PAD_CAP`) |
+
+Font and icon caps are close enough to treat as one boundary. Per regime:
+
+```
+Proportional  body_h = C_PROP x (cardW - 2) + K_PROP
+              C_PROP = (4 x 1.5 + 4.2 + 1.3 x 2.5) / 100 = 0.1345
+              K_PROP = 3                                  (body constant 1 + card border 2)
+
+Transition    body_h = C_PAD x (cardW - 2) + K_TRANS
+              C_PAD   = 4 x 1.5 / 100 = 0.06              (only padding still scales)
+              K_TRANS = 24 + 1.3 x 14 + 1 = 43.2          (capped icon + capped svg + border)
+
+Fully capped  body_h = 4 x 10 + K_TRANS = 83.2
+              K_CAP  = 4 x 10 + K_TRANS + 2 = 85.2        (+ card border)
+```
+
+Grid height and its inverse, per regime (transition shown — the most common case):
+
+```
+gridH     = (sumAspect + rows x C_PAD) x (cardW - 2) + rows x (K_TRANS + 2) + (rows-1) x GAP
+maxCardW  = (H - rows x (K_TRANS + 2) - (rows-1) x GAP) / (sumAspect + rows x C_PAD) + 2
+```
+
+`calcGridH` / `maxCardWForH` dispatch to `propGridH`/`transGridH`/`capGridH` (and their inverses)
+by comparing `cardW` against the two breakpoints. `sumAspect` comes from `rowMaxAspects(cols)` —
+the tallest aspect in each row, summed.
+
+### Why the earlier two-model version was wrong
+
+The original code had only a proportional and a fully-capped model and picked between them:
+
+- **`Math.max`** chose the proportional model, which overestimates `cardW` at large widths → the
+  grid overflowed the window.
+- **`Math.min` with an 85px body cap** predicted `body_h = 85` at `cardW = 587`, where the real
+  value was ~78 because padding hadn't capped yet. `maxCardW` came out 9.7px too conservative →
+  22.8px of dead side-gap and no trim button.
+
+Neither model is accurate anywhere in the 573–669px transition zone, and that zone covers common
+window sizes. The transition model above is derived from the CSS rather than calibrated, and
+matches measured card heights to under 1px.
+
+### Verified against measured layouts
+
+| Case | Prediction | Actual |
+|---|---|---|
+| 650x1024 window, 2 cards, 5:8 display (aspect 0.625), containerH 924 | `transMaxCardW` = 595.87, `transGridH` at that width = 924.0 | 924.0 ✓ |
+| 450x1084 window, 3 cards, cardW 410, rows 3 | `propGridH(1.875, 410, 3, 20)` = 978.6 | 978.4 ✓ (<0.2px) |
+| 2512x745 window, 3 cards, cardW 810.67, rows 1 | `capGridH(0.625, 810.67, 1, 20)` = 590.6 | 590.6 ✓ (<0.1px) |
+
+In the last two cases the pre-fix formulas made trim either a no-op (tall/narrow) or unable to ever
+converge (short/wide); both now clear their excess in a single trim click.
+
+The `oversized` threshold is **2px**. The original 24px was far too coarse to catch these.
+
+**Column count** (the only place `C_BODY = 0.663 - 9/16` is used — a rough body-height
+allowance for the heuristic, *not* part of the height model above)**:**
 - On *add*: `cols = round(sqrt(count))` — square-ish.
 - On *resize*: aspect-aware, `cols = round(sqrt(n · (W/H) · C))`, then shrink while a card would be
   narrower than 410px.
