@@ -33,6 +33,10 @@ app — especially anything touching windows, displays, or fullscreen, which can
 from the code alone. Ask the user for dev-tools output / screenshots when a diagnosis depends on
 runtime behaviour.
 
+When a suite does arrive it will be **Vitest** (Vite-native, near-zero config), scoped to the two
+pure-maths pieces only — the card-height layout model and the MonitorPicker coordinate transforms.
+Rationale and sequencing in [docs/backlog.md](docs/backlog.md).
+
 ## Key files
 
 | File | Responsibility |
@@ -70,9 +74,12 @@ runtime behaviour.
 
 ## Conventions
 
-- File references in chat use clickable markdown links, not backticks.
-- Commit only when the user explicitly asks. Split commits by concern when practical.
-- Don't commit untested code unilaterally — the user tests, then asks for the commit.
-- Ask when unsure rather than guessing. If a diagnosis depends on runtime behaviour, ask for the
-  actual data (dev-tools console output, error text, a screenshot) instead of speculating blindly —
-  especially for platform/timing issues that can't be reasoned out from the code alone.
+Only project-specific conventions live here — general working style, commit policy and output
+conventions are in `~/.claude/CLAUDE.md`.
+
+- **Windows/macOS platform behaviour in this app can't be reasoned out from the code.** For any
+  diagnosis that turns on it, ask for the real data (dev-tools console output, error text, a
+  screenshot) rather than speculating. This overrides the usual assume-and-state default.
+- Windows-specific Electron platform facts this app depends on are written up in
+  `~/.claude/rules/electron-windows.md` — read it before touching z-order, fullscreen or the
+  display maths.
