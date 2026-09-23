@@ -81,5 +81,10 @@ conventions are in `~/.claude/CLAUDE.md`.
   diagnosis that turns on it, ask for the real data (dev-tools console output, error text, a
   screenshot) rather than speculating. This overrides the usual assume-and-state default.
 - Windows-specific Electron platform facts this app depends on are written up in
-  `~/.claude/rules/electron-windows.md` — read it before touching z-order, fullscreen or the
+  `~/.claude/shared/electron-windows.md` — read it before touching z-order, fullscreen or the
   display maths.
+
+## Platform rules
+
+@~/.claude/shared/electron-dev.md
+@~/.claude/shared/electron-windows.md
