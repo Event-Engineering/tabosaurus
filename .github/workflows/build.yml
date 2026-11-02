@@ -18,14 +18,21 @@ jobs:
             platform: win
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
 
       - run: npm ci
+
+      # Tag builds take their version from the tag, so v1.2.3 produces "Tabosaurus Setup 1.2.3.exe"
+      # and the app reports 1.2.3 — without having to bump package.json before tagging.
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
 
       - name: Enable Developer Mode (Windows symlinks required by electron-builder)
         if: runner.os == 'Windows'
@@ -45,7 +52,7 @@ jobs:
           WIN_CSC_LINK: ""
           GH_TOKEN: ${{ github.token }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist-${{ matrix.platform }}
           path: |
@@ -54,13 +61,15 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: github.event_name == 'push'
+    # Runs even if one platform failed, so an unvalidated macOS build can't block the Windows
+    # installer. Publishes whichever installers were built; fails if there are none.
+    if: ${{ !cancelled() && github.event_name == 'push' }}
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
